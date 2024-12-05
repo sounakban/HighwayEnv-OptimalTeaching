@@ -45,4 +45,4 @@ while True:
   while not (done or truncated):
     action, _states = model.predict(obs, deterministic=True)
     obs, reward, done, truncated, info = env.step(action)
-    env.render()
+    env.render(render_mode="rgb_array")
