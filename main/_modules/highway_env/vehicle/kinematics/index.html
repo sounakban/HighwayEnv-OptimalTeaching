@@ -300,7 +300,7 @@
 
 <span class="kn">from</span> <span class="nn">highway_env.road.road</span> <span class="kn">import</span> <span class="n">Road</span>
 <span class="kn">from</span> <span class="nn">highway_env.utils</span> <span class="kn">import</span> <span class="n">Vector</span>
-<span class="kn">from</span> <span class="nn">highway_env.vehicle.objects</span> <span class="kn">import</span> <span class="n">RoadObject</span>
+<span class="kn">from</span> <span class="nn">highway_env.vehicle.objects</span> <span class="kn">import</span> <span class="n">RoadObject</span><span class="p">,</span> <span class="n">Ice1</span>
 
 
 <div class="viewcode-block" id="Vehicle">
@@ -463,6 +463,17 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">crashed</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;acceleration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span>
+        <span class="c1">#TODO: In progress</span>
+        <span class="c1"># Effect of slipping on ice</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">slipped</span><span class="p">:</span>
+          <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slipped</span><span class="p">,</span> <span class="n">Ice1</span><span class="p">):</span>
+                <span class="c1"># Car geos to maximum speed and slides back to original lane </span>
+                <span class="c1">#   This is the exact opposite of any intended avoidence manuever</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;acceleration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">MAX_SPEED</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">slipped</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="c1"># Other ice classes can implement their own effects</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">])</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;acceleration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;acceleration&quot;</span><span class="p">])</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAX_SPEED</span><span class="p">:</span>

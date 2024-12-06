@@ -302,7 +302,7 @@
 <span class="kn">from</span> <span class="nn">highway_env.road.road</span> <span class="kn">import</span> <span class="n">Road</span>
 <span class="kn">from</span> <span class="nn">highway_env.utils</span> <span class="kn">import</span> <span class="n">Vector</span>
 <span class="kn">from</span> <span class="nn">highway_env.vehicle.graphics</span> <span class="kn">import</span> <span class="n">VehicleGraphics</span>
-<span class="kn">from</span> <span class="nn">highway_env.vehicle.objects</span> <span class="kn">import</span> <span class="n">Landmark</span><span class="p">,</span> <span class="n">Obstacle</span>
+<span class="kn">from</span> <span class="nn">highway_env.vehicle.objects</span> <span class="kn">import</span> <span class="n">Landmark</span><span class="p">,</span> <span class="n">Obstacle</span><span class="p">,</span> <span class="n">Ice1</span>
 
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
@@ -698,6 +698,7 @@
     <span class="n">RED</span> <span class="o">=</span> <span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
     <span class="n">GREEN</span> <span class="o">=</span> <span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
     <span class="n">BLACK</span> <span class="o">=</span> <span class="p">(</span><span class="mi">60</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">60</span><span class="p">)</span>
+    <span class="n">GREY</span> <span class="o">=</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
     <span class="n">DEFAULT_COLOR</span> <span class="o">=</span> <span class="n">YELLOW</span>
 
 <div class="viewcode-block" id="RoadObjectGraphics.display">
@@ -804,6 +805,12 @@
                 <span class="n">color</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">GREEN</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">color</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">BLUE</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">object_</span><span class="p">,</span> <span class="n">Ice1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">object_</span><span class="o">.</span><span class="n">hit</span><span class="p">:</span>
+                <span class="c1"># indicates success</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">GREY</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">color</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">GREY</span>
 
         <span class="k">if</span> <span class="n">transparent</span><span class="p">:</span>
             <span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="n">color</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">color</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="mi">30</span><span class="p">)</span>
