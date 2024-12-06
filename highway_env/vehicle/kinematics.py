@@ -7,7 +7,7 @@ import numpy as np
 
 from highway_env.road.road import Road
 from highway_env.utils import Vector
-from highway_env.vehicle.objects import RoadObject
+from highway_env.vehicle.objects import RoadObject, Ice1
 
 
 class Vehicle(RoadObject):
@@ -156,6 +156,17 @@ class Vehicle(RoadObject):
         if self.crashed:
             self.action["steering"] = 0
             self.action["acceleration"] = -1.0 * self.speed
+        #TODO: In progress
+        # Effect of slipping on ice
+        if self.slipped:
+          if isinstance(self.slipped, Ice1):
+                # Car geos to maximum speed and slides back to original lane 
+                #   This is the exact opposite of any intended avoidence manuever
+                self.action["steering"] = self.action["steering"]
+                self.action["acceleration"] = 1.0 * (self.MAX_SPEED - self.speed)
+                self.slipped = False
+            # Other ice classes can implement their own effects
+
         self.action["steering"] = float(self.action["steering"])
         self.action["acceleration"] = float(self.action["acceleration"])
         if self.speed > self.MAX_SPEED:

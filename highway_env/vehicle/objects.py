@@ -55,9 +55,12 @@ class RoadObject(ABC):
         # Collisions have physical effects
         self.solid = True
 
-        # If False, this object will not check its own collisions, but it can still collides with other objects that do
+        # If False, this object will not check its own collisions, but it can still collide with other objects that do
         # check their collisions.
         self.check_collisions = True
+        
+        # Objects slip when they intersect with ice
+        self.slipped = None
 
         self.diagonal = np.sqrt(self.LENGTH**2 + self.WIDTH**2)
         self.crashed = False
@@ -109,10 +112,17 @@ class RoadObject(ABC):
                 else:
                     self.impact = transition / 2
                     other.impact = -transition / 2
+
         if intersecting:
             if self.solid and other.solid:
                 self.crashed = True
                 other.crashed = True
+            elif (self.solid and not other.solid) or (not self.solid and other.solid):
+                # If one is solid, the other is not
+                if isinstance(other, Ice):
+                    self.slipped = other
+                elif isinstance(self, Ice):
+                    other.slipped = self
             if not self.solid:
                 self.hit = True
             if not other.solid:
@@ -223,6 +233,28 @@ class Obstacle(RoadObject):
 
 class Landmark(RoadObject):
     """Landmarks of certain areas on the road that must be reached."""
+
+    def __init__(
+        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
+    ):
+        super().__init__(road, position, heading, speed)
+        self.solid = False
+
+
+# May be used to implement different ice objects (with different mechanics)
+# NOTE: When defining a new Ice class, do not forget to add an entry to graphics.py > get_color()
+class Ice(RoadObject):
+    """Ice on road that leads to erratic behavior of car."""
+
+    def __init__(
+        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
+    ):
+        super().__init__(road, position, heading, speed)
+        self.solid = False
+
+
+class Ice1(Ice):
+    """Ice on road that leads to erratic behavior of car."""
 
     def __init__(
         self, road, position: Sequence[float], heading: float = 0, speed: float = 0
