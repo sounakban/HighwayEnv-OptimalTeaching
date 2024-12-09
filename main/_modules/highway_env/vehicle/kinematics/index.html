@@ -341,6 +341,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">impact</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">log</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">history</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">maxlen</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">HISTORY_SIZE</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">obj_type</span> <span class="o">=</span> <span class="s2">&quot;vehicle&quot;</span>
 
 <div class="viewcode-block" id="Vehicle.create_random">
 <a class="viewcode-back" href="../../../../dynamics/vehicle/kinematics/#highway_env.vehicle.kinematics.Vehicle.create_random">[docs]</a>
@@ -469,7 +470,7 @@
           <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slipped</span><span class="p">,</span> <span class="n">Ice1</span><span class="p">):</span>
                 <span class="c1"># Car geos to maximum speed and slides back to original lane </span>
                 <span class="c1">#   This is the exact opposite of any intended avoidence manuever</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;acceleration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">MAX_SPEED</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">speed</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">slipped</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="c1"># Other ice classes can implement their own effects</span>
