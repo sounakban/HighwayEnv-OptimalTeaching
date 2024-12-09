@@ -47,9 +47,9 @@ class BicycleVehicle(Vehicle):
     MAX_SPEED: float = 15  # [m/s]
 
     def __init__(
-        self, road: Road, position: Vector, heading: float = 0, speed: float = 0, obj_type: str = "vehicle_bicycle"
+        self, road: Road, position: Vector, heading: float = 0, speed: float = 0
     ) -> None:
-        super().__init__(road, position, heading, speed, obj_type)
+        super().__init__(road, position, heading, speed)
         self.lateral_speed = 0
         self.yaw_rate = 0
         self.theta = None

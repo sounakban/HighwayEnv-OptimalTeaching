@@ -30,8 +30,7 @@ class RoadObject(ABC):
         road: Road,
         position: Sequence[float],
         heading: float = 0,
-        speed: float = 0,
-        obj_type: str = ""
+        speed: float = 0
     ):
         """
         :param road: the road instance where the object is placed in
@@ -49,12 +48,6 @@ class RoadObject(ABC):
             else np.nan
         )
         self.lane = self.road.network.get_lane(self.lane_index) if self.road else None
-
-        # Holds information about the type of object. Useful when deciding collintersection physics
-        # Useful for circumventing circular imports
-        # Current implemented types: obstacle, landmark, ice, ice1, vehicle, vehicle_controlled, 
-        #                            vehicle_IDM, vehicle_bicycle
-        self.obj_type = obj_type
 
         # Enable collision with other collidables
         self.collidable = True
@@ -127,7 +120,7 @@ class RoadObject(ABC):
             elif (self.solid and not other.solid) or (not self.solid and other.solid):
                 # If one is solid, the other is not                
                 if self.obj_type == "vehicle_controlled" or other.obj_type == "vehicle_controlled":
-                    # Slip is only implement for ego vehicles
+                    # Slip is only implemented for ego vehicles
                     if other.obj_type.__contains__("Ice"):
                         self.slipped = other
                     elif self.obj_type.__contains__("Ice"):
@@ -234,9 +227,9 @@ class Obstacle(RoadObject):
     """Obstacles on the road."""
 
     def __init__(
-        self, road, position: Sequence[float], heading: float = 0, speed: float = 0, obj_type: str = "obstacle"
+        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading, speed, obj_type)
+        super().__init__(road, position, heading, speed)
         self.solid = True
 
 
@@ -244,9 +237,9 @@ class Landmark(RoadObject):
     """Landmarks of certain areas on the road that must be reached."""
 
     def __init__(
-        self, road, position: Sequence[float], heading: float = 0, speed: float = 0, obj_type: str = "landmark"
+        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading, speed, obj_type)
+        super().__init__(road, position, heading, speed)
         self.solid = False
 
 
@@ -256,9 +249,9 @@ class Ice(RoadObject):
     """Ice on road that leads to erratic behavior of car."""
 
     def __init__(
-        self, road, position: Sequence[float], heading: float = 0, speed: float = 0, obj_type: str = "ice"
+        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading, speed, obj_type)
+        super().__init__(road, position, heading, speed)
         self.solid = False
 
 
@@ -266,7 +259,7 @@ class Ice1(Ice):
     """Ice on road that leads to erratic behavior of car."""
 
     def __init__(
-        self, road, position: Sequence[float], heading: float = 0, speed: float = 0, obj_type: str = "ice1"
+        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading, speed, obj_type)
+        super().__init__(road, position, heading, speed)
         self.solid = False

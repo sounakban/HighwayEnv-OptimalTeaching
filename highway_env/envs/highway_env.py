@@ -83,6 +83,7 @@ class HighwayEnv(AbstractEnv):
             vehicle = self.action_type.vehicle_class(
                 self.road, vehicle.position, vehicle.heading, vehicle.speed
             )
+            print("Ego vehicle class: ", type(vehicle).__name__)
             self.controlled_vehicles.append(vehicle)
             self.road.vehicles.append(vehicle)
 

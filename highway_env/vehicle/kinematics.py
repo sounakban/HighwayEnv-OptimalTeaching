@@ -37,10 +37,9 @@ class Vehicle(RoadObject):
         position: Vector,
         heading: float = 0,
         speed: float = 0,
-        predition_type: str = "constant_steering",
-        obj_type: str = "vehicle"
+        predition_type: str = "constant_steering"
     ):
-        super().__init__(road, position, heading, speed, obj_type)
+        super().__init__(road, position, heading, speed)
         self.prediction_type = predition_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
@@ -160,7 +159,7 @@ class Vehicle(RoadObject):
         #TODO: In progress
         # Effect of slipping on ice
         if self.slipped:
-          if isinstance(self.slipped.obj_type=="Ice1"):
+          if isinstance(type(self.slipped).__name__=="Ice1"):
                 # Car geos to maximum speed and slides back to original lane 
                 #   This is the exact opposite of any intended avoidence manuever
                 self.action["steering"] = -self.action["steering"]
