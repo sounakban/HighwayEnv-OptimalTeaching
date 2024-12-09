@@ -332,10 +332,9 @@
         <span class="n">position</span><span class="p">:</span> <span class="n">Vector</span><span class="p">,</span>
         <span class="n">heading</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="n">speed</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="n">predition_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;constant_steering&quot;</span><span class="p">,</span>
-        <span class="n">obj_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;vehicle&quot;</span>
+        <span class="n">predition_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;constant_steering&quot;</span>
     <span class="p">):</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">road</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">heading</span><span class="p">,</span> <span class="n">speed</span><span class="p">,</span> <span class="n">obj_type</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">road</span><span class="p">,</span> <span class="n">position</span><span class="p">,</span> <span class="n">heading</span><span class="p">,</span> <span class="n">speed</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">prediction_type</span> <span class="o">=</span> <span class="n">predition_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">action</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;steering&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;acceleration&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">crashed</span> <span class="o">=</span> <span class="kc">False</span>
@@ -467,7 +466,7 @@
         <span class="c1">#TODO: In progress</span>
         <span class="c1"># Effect of slipping on ice</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">slipped</span><span class="p">:</span>
-          <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slipped</span><span class="o">.</span><span class="n">obj_type</span><span class="o">==</span><span class="s2">&quot;Ice1&quot;</span><span class="p">):</span>
+          <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slipped</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="o">==</span><span class="s2">&quot;Ice1&quot;</span><span class="p">):</span>
                 <span class="c1"># Car geos to maximum speed and slides back to original lane </span>
                 <span class="c1">#   This is the exact opposite of any intended avoidence manuever</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">action</span><span class="p">[</span><span class="s2">&quot;steering&quot;</span><span class="p">]</span>
