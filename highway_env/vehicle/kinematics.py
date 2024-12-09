@@ -160,7 +160,7 @@ class Vehicle(RoadObject):
         #TODO: In progress
         # Effect of slipping on ice
         if self.slipped:
-          if isinstance(self.slipped, Ice1):
+          if isinstance(self.slipped.obj_type=="Ice1"):
                 # Car geos to maximum speed and slides back to original lane 
                 #   This is the exact opposite of any intended avoidence manuever
                 self.action["steering"] = -self.action["steering"]

@@ -125,11 +125,13 @@ class RoadObject(ABC):
                 self.crashed = True
                 other.crashed = True
             elif (self.solid and not other.solid) or (not self.solid and other.solid):
-                # If one is solid, the other is not
-                if isinstance(other, Ice):
-                    self.slipped = other
-                elif isinstance(self, Ice):
-                    other.slipped = self
+                # If one is solid, the other is not                
+                if self.obj_type == "vehicle_controlled" or other.obj_type == "vehicle_controlled":
+                    # Slip is only implement for ego vehicles
+                    if other.obj_type.__contains__("Ice"):
+                        self.slipped = other
+                    elif self.obj_type.__contains__("Ice"):
+                        other.slipped = self
             if not self.solid:
                 self.hit = True
             if not other.solid:
