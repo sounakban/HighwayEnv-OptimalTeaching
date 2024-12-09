@@ -38,15 +38,15 @@ class Vehicle(RoadObject):
         heading: float = 0,
         speed: float = 0,
         predition_type: str = "constant_steering",
+        obj_type: str = "vehicle"
     ):
-        super().__init__(road, position, heading, speed)
+        super().__init__(road, position, heading, speed, obj_type)
         self.prediction_type = predition_type
         self.action = {"steering": 0, "acceleration": 0}
         self.crashed = False
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
-        self.obj_type = "vehicle"
 
     @classmethod
     def create_random(

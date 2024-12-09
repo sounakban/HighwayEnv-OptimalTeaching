@@ -47,14 +47,13 @@ class BicycleVehicle(Vehicle):
     MAX_SPEED: float = 15  # [m/s]
 
     def __init__(
-        self, road: Road, position: Vector, heading: float = 0, speed: float = 0
+        self, road: Road, position: Vector, heading: float = 0, speed: float = 0, obj_type: str = "vehicle_bicycle"
     ) -> None:
-        super().__init__(road, position, heading, speed)
+        super().__init__(road, position, heading, speed, obj_type)
         self.lateral_speed = 0
         self.yaw_rate = 0
         self.theta = None
         self.A_lat, self.B_lat = self.lateral_lpv_dynamics()
-        self.obj_type = "vehicle_bicycle"
 
     @property
     def state(self) -> np.ndarray:

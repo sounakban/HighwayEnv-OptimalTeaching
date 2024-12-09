@@ -56,13 +56,13 @@ class IDMVehicle(ControlledVehicle):
         route: Route = None,
         enable_lane_change: bool = True,
         timer: float = None,
+        obj_type: str = "vehicle_IDM"
     ):
         super().__init__(
-            road, position, heading, speed, target_lane_index, target_speed, route
+            road, position, heading, speed, target_lane_index, target_speed, route, obj_type
         )
         self.enable_lane_change = enable_lane_change
         self.timer = timer or (np.sum(self.position) * np.pi) % self.LANE_CHANGE_DELAY
-        self.obj_type = "vehicle_IDM"
 
     def randomize_behavior(self):
         self.DELTA = self.road.np_random.uniform(
