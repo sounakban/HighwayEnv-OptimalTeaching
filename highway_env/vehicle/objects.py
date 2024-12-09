@@ -49,6 +49,11 @@ class RoadObject(ABC):
         )
         self.lane = self.road.network.get_lane(self.lane_index) if self.road else None
 
+        # Holds information about the type of object. Useful when deciding collintersection physics
+        # Current implemented types: obstacle, landmark, ice, ice1, vehicle, vehicle_controlled, 
+        #                            vehicle_IDM, vehicle_bicycle
+        self.obj_type = None
+
         # Enable collision with other collidables
         self.collidable = True
 
@@ -229,6 +234,7 @@ class Obstacle(RoadObject):
     ):
         super().__init__(road, position, heading, speed)
         self.solid = True
+        self.obj_type = "obstacle"
 
 
 class Landmark(RoadObject):
@@ -239,6 +245,7 @@ class Landmark(RoadObject):
     ):
         super().__init__(road, position, heading, speed)
         self.solid = False
+        self.obj_type = "landmark"
 
 
 # May be used to implement different ice objects (with different mechanics)
@@ -251,6 +258,7 @@ class Ice(RoadObject):
     ):
         super().__init__(road, position, heading, speed)
         self.solid = False
+        self.obj_type = "ice"
 
 
 class Ice1(Ice):
@@ -261,3 +269,4 @@ class Ice1(Ice):
     ):
         super().__init__(road, position, heading, speed)
         self.solid = False
+        self.obj_type = "ice1"

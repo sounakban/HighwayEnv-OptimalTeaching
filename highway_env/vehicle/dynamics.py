@@ -54,6 +54,7 @@ class BicycleVehicle(Vehicle):
         self.yaw_rate = 0
         self.theta = None
         self.A_lat, self.B_lat = self.lateral_lpv_dynamics()
+        self.obj_type = "vehicle_bicycle"
 
     @property
     def state(self) -> np.ndarray:

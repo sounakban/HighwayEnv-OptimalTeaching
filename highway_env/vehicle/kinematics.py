@@ -46,6 +46,7 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
+        self.obj_type = "vehicle"
 
     @classmethod
     def create_random(
@@ -162,7 +163,7 @@ class Vehicle(RoadObject):
           if isinstance(self.slipped, Ice1):
                 # Car geos to maximum speed and slides back to original lane 
                 #   This is the exact opposite of any intended avoidence manuever
-                self.action["steering"] = self.action["steering"]
+                self.action["steering"] = -self.action["steering"]
                 self.action["acceleration"] = 1.0 * (self.MAX_SPEED - self.speed)
                 self.slipped = False
             # Other ice classes can implement their own effects

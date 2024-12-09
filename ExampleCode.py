@@ -31,9 +31,9 @@ model = DQN('MlpPolicy', env,
               train_freq=1,
               gradient_steps=1,
               target_update_interval=50,
-              verbose=1,
               device="cuda",
-              tensorboard_log="highway_dqn/")
+              tensorboard_log="highway_dqn/",
+              verbose=1)
 model.learn(int(2e4))
 # model.save("highway_dqn/model")
 
