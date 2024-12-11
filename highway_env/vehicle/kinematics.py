@@ -156,7 +156,7 @@ class Vehicle(RoadObject):
         if self.crashed:
             self.action["steering"] = 0
             self.action["acceleration"] = -1.0 * self.speed
-        #TODO: In progress
+        #TODO: Simulate and check logic
         # Effect of slipping on ice
         if self.slipped:
           if isinstance(type(self.slipped).__name__=="Ice1"):

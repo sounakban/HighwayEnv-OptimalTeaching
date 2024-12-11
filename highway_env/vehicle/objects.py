@@ -119,11 +119,11 @@ class RoadObject(ABC):
                 other.crashed = True
             elif (self.solid and not other.solid) or (not self.solid and other.solid):
                 # If one is solid, the other is not                
-                if self.obj_type == "vehicle_controlled" or other.obj_type == "vehicle_controlled":
+                if not (type(self).__name__ == "IDMVehicle" or type(other).__name__ == "IDMVehicle"):
                     # Slip is only implemented for ego vehicles
-                    if other.obj_type.__contains__("Ice"):
+                    if type(other).__name__.__contains__("Ice"):
                         self.slipped = other
-                    elif self.obj_type.__contains__("Ice"):
+                    elif type(self).__name__.__contains__("Ice"):
                         other.slipped = self
             if not self.solid:
                 self.hit = True
@@ -254,12 +254,77 @@ class Ice(RoadObject):
         super().__init__(road, position, heading, speed)
         self.solid = False
 
+    @classmethod
+    def create_random(
+        cls,
+        road: Road,
+        lane_from: str | None = None,
+        lane_to: str | None = None,
+        lane_id: int | None = None,
+        spacing: float = 1,
+    ) -> Ice:
+        """
+        Create a random vehicle on the road.
+
+        The lane and /or speed are chosen randomly, while longitudinal position is chosen behind the last
+        vehicle in the road with density based on the number of lanes.
+
+        :param road: the road where the vehicle is driving
+        :param speed: initial speed in [m/s]. If None, will be chosen randomly
+        :param lane_from: start node of the lane to spawn in
+        :param lane_to: end node of the lane to spawn in
+        :param lane_id: id of the lane to spawn in
+        :param spacing: ratio of spacing to the front vehicle, 1 being the default
+        :return: A vehicle with random position and/or speed
+        """
+        # TODO: Incomplete funtion definition
+        _from = lane_from or road.np_random.choice(list(road.network.graph.keys()))
+        _to = lane_to or road.np_random.choice(list(road.network.graph[_from].keys()))
+        _id = lane_id or road.np_random.choice(len(road.network.graph[_from][_to]))
+        #       (
+        #     lane_id
+        #     if lane_id is not None
+        #     else road.np_random.choice(len(road.network.graph[_from][_to]))
+        # )
+        lane = road.network.get_lane((_from, _to, _id))
+        # if speed is None:
+        #     if lane.speed_limit is not None:
+        #         speed = road.np_random.uniform(
+        #             0.7 * lane.speed_limit, 0.8 * lane.speed_limit
+        #         )
+        #     else:
+        #         speed = road.np_random.uniform(
+        #             Vehicle.DEFAULT_INITIAL_SPEEDS[0], Vehicle.DEFAULT_INITIAL_SPEEDS[1]
+        #         )
+        default_spacing = 12 + 1.0 * speed
+        offset = (
+            spacing
+            * default_spacing
+            * np.exp(-5 / 40 * len(road.network.graph[_from][_to]))
+        )
+        x0 = (
+            np.max([lane.local_coordinates(v.position)[0] for v in road.vehicles])
+            if len(road.vehicles)
+            else 3 * offset
+        )
+        x0 += offset * road.np_random.uniform(0.9, 1.1)
+        v = cls(road, lane.position(x0, 0), lane.heading_at(x0), speed)
+        return v
+
+
 
 class Ice1(Ice):
     """Ice on road that leads to erratic behavior of car."""
 
     def __init__(
-        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
+        self, road, position: Sequence[float]#, heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading, speed)
+        super().__init__(road, position, heading = 0, speed = 0)
         self.solid = False
+
+    @classmethod
+    def create_from_ice(cls, ice_object: Ice):
+        return Ice1(road = ice_object.road, 
+                    position = ice_object.position, 
+                    heading = ice_object.heading, 
+                    speed = ice_object.speed)

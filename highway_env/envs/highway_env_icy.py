@@ -14,7 +14,7 @@ from highway_env.vehicle.kinematics import Vehicle
 Observation = np.ndarray
 
 
-class HighwayEnv(AbstractEnv):
+class HighwayEnvIcy(AbstractEnv):
     """
     A highway driving environment.
 
@@ -93,6 +93,10 @@ class HighwayEnv(AbstractEnv):
                 vehicle.randomize_behavior()
                 self.road.vehicles.append(vehicle)
 
+        for veh in self.road.vehicles:
+            print(veh.position)
+        # TODO: add ice, freqency based on config
+
     def _reward(self, action: Action) -> float:
         """
         The reward is defined to foster driving at high speed, on the rightmost lanes, and to avoid collisions.
@@ -147,7 +151,7 @@ class HighwayEnv(AbstractEnv):
         return self.time >= self.config["duration"]
 
 
-class HighwayEnvFast(HighwayEnv):
+class HighwayEnvIcyFast(HighwayEnvIcy):
     """
     A variant of highway-v0 with faster execution:
         - lower simulation frequency

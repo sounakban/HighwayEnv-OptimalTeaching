@@ -1,5 +1,6 @@
 from highway_env.envs.exit_env import ExitEnv
 from highway_env.envs.highway_env import HighwayEnv, HighwayEnvFast
+from highway_env.envs.highway_env_icy import HighwayEnvIcy, HighwayEnvIcyFast
 from highway_env.envs.intersection_env import (
     ContinuousIntersectionEnv,
     IntersectionEnv,
@@ -22,6 +23,8 @@ __all__ = [
     "ExitEnv",
     "HighwayEnv",
     "HighwayEnvFast",
+    "HighwayEnvIcy",
+    "HighwayEnvIcyFast",
     "IntersectionEnv",
     "ContinuousIntersectionEnv",
     "MultiAgentIntersectionEnv",
