@@ -249,9 +249,9 @@ class Ice(RoadObject):
     """Ice on road that leads to erratic behavior of car."""
 
     def __init__(
-        self, road, position: Sequence[float], heading: float = 0, speed: float = 0
+        self, road, position: Sequence[float]#, heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading, speed)
+        super().__init__(road, position, heading = 0, speed = 0)
         self.solid = False
 
     @classmethod
@@ -319,7 +319,7 @@ class Ice1(Ice):
     def __init__(
         self, road, position: Sequence[float]#, heading: float = 0, speed: float = 0
     ):
-        super().__init__(road, position, heading = 0, speed = 0)
+        super().__init__(road, position)#, heading = 0, speed = 0)
         self.solid = False
 
     @classmethod

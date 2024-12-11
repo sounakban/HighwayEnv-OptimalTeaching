@@ -159,7 +159,7 @@ class Vehicle(RoadObject):
         #TODO: Simulate and check logic
         # Effect of slipping on ice
         if self.slipped:
-          if isinstance(type(self.slipped).__name__=="Ice1"):
+          if type(self.slipped).__name__=="Ice1":
                 # Car geos to maximum speed and slides back to original lane 
                 #   This is the exact opposite of any intended avoidence manuever
                 self.action["steering"] = -self.action["steering"]

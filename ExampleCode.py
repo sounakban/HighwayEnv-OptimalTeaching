@@ -20,7 +20,9 @@ from stable_baselines3 import DQN
 
 
 # env = gymnasium.make("highway-fast-v0", render_mode="human")  # Nice visualization of learning process
-env = gymnasium.make("highway-fast-v0")
+# env = gymnasium.make("highway-fast-v0")
+env = gymnasium.make("highway-icy-fast-v0", render_mode="human")
+# env = gymnasium.make("highway-icy-fast-v0")
 model = DQN('MlpPolicy', env,
               policy_kwargs=dict(net_arch=[256, 256]),
               learning_rate=5e-4,
