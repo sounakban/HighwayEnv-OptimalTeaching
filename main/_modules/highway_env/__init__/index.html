@@ -336,6 +336,17 @@
         <span class="n">entry_point</span><span class="o">=</span><span class="s2">&quot;highway_env.envs.highway_env:HighwayEnvFast&quot;</span><span class="p">,</span>
     <span class="p">)</span>
 
+    <span class="c1"># highway_env_icy.py</span>
+    <span class="n">register</span><span class="p">(</span>
+        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;highway-icy-v0&quot;</span><span class="p">,</span>
+        <span class="n">entry_point</span><span class="o">=</span><span class="s2">&quot;highway_env.envs.highway_env_icy:HighwayEnvIcy&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">register</span><span class="p">(</span>
+        <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;highway-icy-fast-v0&quot;</span><span class="p">,</span>
+        <span class="n">entry_point</span><span class="o">=</span><span class="s2">&quot;highway_env.envs.highway_env_icy:HighwayEnvIcyFast&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
     <span class="c1"># intersection_env.py</span>
     <span class="n">register</span><span class="p">(</span>
         <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;intersection-v0&quot;</span><span class="p">,</span>
