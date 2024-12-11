@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections import deque
+from frozendict import frozendict
 
 import numpy as np
 
@@ -46,6 +47,14 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
+    
+    def _hashable_state(self):
+        return {
+            "id": id(self),
+            "position": self.position,
+            "heading": self.heading,
+            "speed": self.speed,
+        }
 
     @classmethod
     def create_random(
