@@ -148,6 +148,19 @@ This agent leverages a transition and reward models to perform a stochastic tree
 
 `pip install highway-env`
 
+## Dependencies
+
+This code has been tested with Python 3.12
+
+to install dependencies (expect pytorch) run
+
+```
+pip install -r /path/to/requirements.txt
+```
+
+Install pytorch version based on system configuration. The correct installation command can be found [here](https://pytorch.org/get-started/locally/).
+
+
 ## Usage
 
 ```python
@@ -161,6 +174,8 @@ while not (done or truncated):
     action = ... # Your agent code here
     obs, reward, done, truncated, info = env.step(action)
 ```
+
+
 
 ## Documentation
 

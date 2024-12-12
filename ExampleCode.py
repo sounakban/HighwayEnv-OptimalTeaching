@@ -13,16 +13,31 @@
 
 
 
-import gymnasium
+import gymnasium as gym
+# from gymnasium.wrappers import RecordVideo
+from gymnasium.wrappers import RecordVideo
 import highway_env
 from stable_baselines3 import DQN
 
 
+# Possible environments and render-modes
+# env = gym.make("highway-fast-v0", render_mode="human")  # Nice visualization of learning process
+# env = gym.make("highway-fast-v0")
+env = gym.make("highway-icy-fast-v0", render_mode="human")
+# env = gym.make("highway-icy-fast-v0")
 
-# env = gymnasium.make("highway-fast-v0", render_mode="human")  # Nice visualization of learning process
-# env = gymnasium.make("highway-fast-v0")
-env = gymnasium.make("highway-icy-fast-v0", render_mode="human")
-# env = gymnasium.make("highway-icy-fast-v0")
+# Record simulation video
+## recording needs rgb_array render mode
+# env = gym.make("highway-icy-fast-v0", render_mode="rgb_array")
+# env = gym.make("highway-fast-v0", render_mode="rgb_array")
+## Wrap the env by a RecordVideo wrapper
+# env = RecordVideo(env, video_folder="run",
+              # episode_trigger=lambda e: True)  # record all episodes
+## Provide the video recorder to the wrapped environment
+## so it can send it intermediate simulation frames.
+# env.unwrapped.set_record_video_wrapper(env)
+
+
 model = DQN('MlpPolicy', env,
               policy_kwargs=dict(net_arch=[256, 256]),
               learning_rate=5e-4,

@@ -1,0 +1,7 @@
+gymnasium==1.0.0
+matplotlib==3.9.2
+moviepy==1.0.3
+pygame==2.6.1
+scipy==1.14.1
+stable-baselines3==2.4.0
+tensorboard==2.18.0
