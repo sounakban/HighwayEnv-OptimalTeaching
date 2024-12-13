@@ -577,6 +577,14 @@
             <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;vx&quot;</span><span class="p">,</span> <span class="s2">&quot;vy&quot;</span><span class="p">]:</span>
                 <span class="n">d</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">-=</span> <span class="n">origin_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">d</span>
+    
+    <span class="c1"># def _hashable_state(self):</span>
+    <span class="c1">#     return {</span>
+    <span class="c1">#         &quot;id&quot;: id(self),</span>
+    <span class="c1">#         &quot;position&quot;: self.position,</span>
+    <span class="c1">#         &quot;heading&quot;: self.heading,</span>
+    <span class="c1">#         &quot;speed&quot;: self.speed,</span>
+    <span class="c1">#     }</span>
 
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> #</span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
