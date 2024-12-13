@@ -270,6 +270,14 @@ class Vehicle(RoadObject):
             for key in ["x", "y", "vx", "vy"]:
                 d[key] -= origin_dict[key]
         return d
+    
+    # def _hashable_state(self):
+    #     return {
+    #         "id": id(self),
+    #         "position": self.position,
+    #         "heading": self.heading,
+    #         "speed": self.speed,
+    #     }
 
     def __str__(self):
         return "{} #{}: {}".format(

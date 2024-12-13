@@ -178,6 +178,7 @@ class AbstractEnv(gym.Env):
             "speed": self.vehicle.speed,
             "crashed": self.vehicle.crashed,
             "action": action,
+            # "vehicles": tuple([v._hashable_state() for v in self.road.vehicles])
         }
         try:
             info["rewards"] = self._rewards(action)
