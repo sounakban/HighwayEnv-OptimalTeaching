@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import os
-from typing import TypeVar
+from typing import TypeVar, TYPE_CHECKING
 
 import gymnasium as gym
 import numpy as np
@@ -17,6 +17,10 @@ from highway_env.envs.common.graphics import EnvViewer
 from highway_env.envs.common.observation import ObservationType, observation_factory
 from highway_env.vehicle.behavior import IDMVehicle
 from highway_env.vehicle.kinematics import Vehicle
+
+if TYPE_CHECKING:
+    from highway_env.road.lane import AbstractLane
+    from highway_env.road.road import Road
 
 
 Observation = TypeVar("Observation")
@@ -49,7 +53,7 @@ class AbstractEnv(gym.Env):
         self.configure(config)
 
         # Scene
-        self.road = None
+        self.road : Road = None
         self.controlled_vehicles = []
 
         # Spaces
@@ -94,7 +98,7 @@ class AbstractEnv(gym.Env):
         return {
             "observation": {"type": "Kinematics"},
             "action": {"type": "DiscreteMetaAction"},
-            "simulation_frequency": 24,  # [Hz]
+            "simulation_frequency": 15,  # [Hz]
             "policy_frequency": 1,  # [Hz]
             "other_vehicles_type": "highway_env.vehicle.behavior.IDMVehicle",
             "screen_width": 600,  # [px]
@@ -177,7 +181,8 @@ class AbstractEnv(gym.Env):
         info = {
             "speed": self.vehicle.speed,
             "crashed": self.vehicle.crashed,
-            "action": action
+            "action": action,
+            "vehicles": tuple([v._hashable_state() for v in self.road.vehicles])
         }
         try:
             info["rewards"] = self._rewards(action)

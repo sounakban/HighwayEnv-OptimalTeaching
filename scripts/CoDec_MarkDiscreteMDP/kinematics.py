@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import copy
 from collections import deque
+from frozendict import frozendict
 
 import numpy as np
 
 from highway_env.road.road import Road
 from highway_env.utils import Vector
-from highway_env.vehicle.objects import RoadObject
+from highway_env.vehicle.objects import RoadObject, Ice1
 
 
 class Vehicle(RoadObject):
@@ -46,6 +47,14 @@ class Vehicle(RoadObject):
         self.impact = None
         self.log = []
         self.history = deque(maxlen=self.HISTORY_SIZE)
+    
+    def _hashable_state(self):
+        return {
+            "id": id(self),
+            "position": self.position,
+            "heading": self.heading,
+            "speed": self.speed,
+        }
 
     @classmethod
     def create_random(
@@ -159,16 +168,13 @@ class Vehicle(RoadObject):
         #TODO: Simulate and check logic
         # Effect of slipping on ice
         if self.slipped:
-            if type(self.slipped).__name__=="Ice1":
-                if self.action["steering"] != 0:
-                    # Car geos to maximum speed and slides opposite to the intendd direction of steering
-                    #   This is the exact opposite of any intended avoidence manuever
-                    self.action["steering"] = -self.action["steering"] # Steering angle ranges from -pi/3 to pi/3, as pecified in the ControlledVehicles class
-                    self.speed = float(self.MAX_SPEED)
-                else:
-                    self.speed = float(self.MAX_SPEED)
+          if type(self.slipped).__name__=="Ice1":
+                # Car geos to maximum speed and slides back to original lane 
+                #   This is the exact opposite of any intended avoidence manuever
+                self.action["steering"] = -self.action["steering"]
+                self.action["acceleration"] = 1.0 * (self.MAX_SPEED - self.speed)
+                self.slipped = False
             # Other ice classes can implement their own effects
-            self.slipped = False
 
         self.action["steering"] = float(self.action["steering"])
         self.action["acceleration"] = float(self.action["acceleration"])
