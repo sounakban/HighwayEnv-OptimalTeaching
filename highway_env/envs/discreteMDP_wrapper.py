@@ -25,12 +25,15 @@ class GymDiscreteMDP:
 
 
     def __init__(self, *args, **kwargs):
-        self._currMDP = None
+        self._mdp_tables = None
+        self._mdp_matrices = None
+        self._mdp_plan = None
         if "config" in kwargs:
             self.config = kwargs.get("config", None)
         self._env = gym.make(*args, **kwargs)
         self.obs, self.info = self._env.reset()
         self._initial_state = self.to_hashable_state(self.obs)
+        self._curr_state = copy.deepcopy(self._initial_state)
         action_space = self._env.action_space
         if isinstance(action_space, gym.spaces.discrete.Discrete):
             self._actions = range(action_space.start, action_space.n)
@@ -40,11 +43,31 @@ class GymDiscreteMDP:
 
 
     @property
-    def currMDP(self): 
+    def mdp_tables(self): 
         """
-        Return the current MDPtable object.
+        Return the current MDPtables object.
         """
-        return self._currMDP
+        return self._mdp_tables
+
+
+    @property
+    def mdp_matrices(self): 
+        """
+        Return the current MDPmatrices object.
+        """
+        if self._mdp_matrices == None:
+            self._mdp_matrices = self.get_MDPmatrices()
+        return self._mdp_matrices
+
+
+    @property
+    def mdp_plan(self): 
+        """
+        Return the current MDPplan object.
+        """
+        if self._mdp_plan == None:
+            self._mdp_plan = self.value_iteration()
+        return self._mdp_plan
        
 
     @property
@@ -61,6 +84,22 @@ class GymDiscreteMDP:
         Set the current MDPtable object.
         """
         self._initial_state = initial_state
+       
+
+    @property
+    def current_state(self): 
+        """
+        Return the current MDPtable object.
+        """
+        return self._current_state
+       
+
+    @initial_state.setter 
+    def current_state(self, current_state): 
+        """
+        Set the current MDPtable object.
+        """
+        self._current_state = current_state
 
 
     @property
@@ -90,7 +129,7 @@ class GymDiscreteMDP:
 
     def to_hashable_state(self, obs):
         """
-        Create hashable variable using environment state information.
+        Create hashable (discretized) variable using environment state information.
         """        
         raise NotImplementedError("Please Implement this method")
 
@@ -106,7 +145,7 @@ class GymDiscreteMDP:
         obs, reward, done, truncated, info = self._env.step(action)
         logging.debug(obs)
         next_state = self.to_hashable_state(obs)
-        self._initial_state = next_state    # Update intital state to reflect updated environment state.
+        self._current_state = next_state    # Update intital state to reflect updated environment state.
         return next_state, 1, reward, done, truncated, info
     
 
@@ -114,7 +153,7 @@ class GymDiscreteMDP:
         """
         Set the current MDPtable object.
         """
-        self._currMDP = MDPTable(transition=transition, absorption=absorption, reward=reward, state_list=state_list, action_list=action_list)
+        self._mdp_tables = MDPTable(transition=transition, absorption=absorption, reward=reward, state_list=state_list, action_list=action_list)
    
 
     def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0):
@@ -136,15 +175,11 @@ class GymDiscreteMDP:
         Parameters:
             None
         """
-        tb = self._currMDP
+        tb = self._mdp_tables
         if tb == None:
-            raise ValueError("MDP table not set up yet")
+            raise ValueError("MDP tables not set up yet.")
         state_idx = {s: i for i, s in enumerate(tb.state_list)}
         action_idx = {a: i for i, a in enumerate(tb.action_list)}
-        print(len(tb.state_list))
-        print(state_idx.values())
-        print(len(state_idx.values()))
-        print(len(state_idx))
         transition_mat = np.zeros((len(state_idx), len(action_idx), len(state_idx)))
         reward_mat = np.ones((len(state_idx), len(action_idx)))*-np.inf
         absorbing_vec = np.array([tb.absorption[s] if s in tb.absorption else False for s in tb.state_list], dtype=bool)
@@ -153,7 +188,7 @@ class GymDiscreteMDP:
                 transition_mat[state_idx[s], action_idx[a], state_idx[ns]] = prob
         for (s, a), r in tb.reward.items():
             reward_mat[state_idx[s], action_idx[a]] = r
-        return MDPMatrix(
+        return  MDPMatrix(
             transition=transition_mat,
             reward=reward_mat,
             absorbing_state_mask=absorbing_vec,
@@ -161,7 +196,7 @@ class GymDiscreteMDP:
             state_list=tb.state_list,
             action_list=tb.action_list
         )
-
+        
 
     def value_iteration(
             self,
@@ -195,8 +230,8 @@ class GymDiscreteMDP:
         action_values = {}
         for s, q in zip(m.state_list, qvalues):
             action_values[s] = dict(zip(m.action_list, q))
-        print(value)
-        print(action_values)
+        logging.debug(value)
+        logging.debug(action_values)
         return PlanningResult(
             state_values=dict(zip(m.state_list, value.tolist())),
             action_values=action_values
@@ -330,17 +365,17 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                 for action, next_state, trans_prob, reward, done, truncated, info, updated_MDPstate in return_vals:
                     logging.debug(str(state[0]) + ' | ' + str(action) + ' | ' + str(next_state[0]))
                     #2# Populate transitions table
-                    if (state[0], action) not in transitions:
-                        transitions[(state[0], action)] = {}
-                    if next_state[0] not in transitions[(state[0], action)]:
-                        transitions[(state[0], action)][next_state[0]] = trans_prob
+                    if (state, action) not in transitions:
+                        transitions[(state, action)] = {}
+                    if next_state not in transitions[(state, action)]:
+                        transitions[(state, action)][next_state] = trans_prob
                     #2# Populate reward functions
                     if (state[0], action) in rewards:
-                        rewards[(state[0], action)] += reward * trans_prob
+                        rewards[(state, action)] += reward * trans_prob
                     else:
-                        rewards[(state[0], action)] = reward * trans_prob
+                        rewards[(state, action)] = reward * trans_prob
                     #2# set absorption states
-                    absorption[next_state[0]] = done or truncated
+                    absorption[next_state] = done or truncated
                     #2# Populate visited
                     if next_state not in visited:
                         frontier.add((next_state, depth + 1, updated_MDPstate))
@@ -349,8 +384,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             else:
                 #2# Set rewards for unexplored state-action pairs to 0
                 for action in self.actions:
-                    if not (state[0], action) in rewards:
-                        rewards[(state[0], action)] = unknown_reward
+                    if not (state, action) in rewards:
+                        rewards[(state, action)] = unknown_reward
                 MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
                             " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
                 logging.info(MDPstatus)
@@ -359,9 +394,41 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             # close all duplicate environments
             curr_MDPstate.env.close()
         env2close = set()   # Close ununsed environments at the end of the loop
-        # print(highway_mdp.actions)
         self.create_MDPTable(transition=transitions, absorption=absorption, reward=rewards, 
-                             state_list={v[0] for v in visited}, action_list=set(self.actions))
+                             state_list=visited, action_list=set(self.actions))
+        
+
+    def copy_class_with_env(self, env):
+        curr_copy = copy.deepcopy(self)
+        curr_copy.env = env
+        return curr_copy
+
+    def get_construals_singleobj(self):        
+        veh_list = self._env.unwrapped.road.vehicles[:]     # Only contains list of vehicles
+        ego_veh = veh_list[0]
+        veh_list = veh_list[1:]                             # Update list to only contain ado vehicles
+        obj_list = veh_list[:]                              # Contains list of all objects
+        obj_list.extend(self._env.unwrapped.road.objects)
+        contrued_envs = []
+        # Add an empty environment
+        env_copy = self.env
+        env_copy.unwrapped.road.vehicles = [ego_veh]
+        env_copy.unwrapped.road.objects = []
+        contrued_envs.append(self.copy_class_with_env(env_copy))
+        # Add other environments
+        for obj in obj_list:
+            env_copy = self.env
+            if obj in veh_list:
+                # Object is a vehicle
+                env_copy.unwrapped.road.vehicles = [ego_veh, obj]
+                env_copy.unwrapped.road.objects = []
+            else:
+                # Object is roadobject
+                env_copy.unwrapped.road.vehicles = [ego_veh]
+                env_copy.unwrapped.road.objects = [obj]
+            # env_copy.unwrapped.road.vehicles.remove(veh)
+            contrued_envs.append(self.copy_class_with_env(env_copy))
+        return contrued_envs
 
 
     # def set_vehicles(self, vehicles):
@@ -385,66 +452,70 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
 
 
 
+@dataclasses.dataclass(order=True)
+class OptimalPolicy():
+    inverse_temperature: float
+    random_action_prob: float
 
-# class OptimalPolicy():
-#     inverse_temperature: float = float('inf')
-#     random_action_prob: float = 0.0
 
-#     _state_value_dict: dict[frozendict, float] = \
-#         dataclasses.field(default_factory=dict)
-#     _action_value_dict: dict[frozendict, dict[int, float]] = \
-#         dataclasses.field(default_factory=dict)
+    def __init__(self, mdp: GymDiscreteMDP, inverse_temperature: float=float('inf'), random_action_prob: float=0.0):
+        if mdp.mdp_plan == None:
+            raise ValueError("MDP planning result not set up for the class object.")
+        self.inverse_temperature = inverse_temperature
+        self.random_action_prob = random_action_prob
+        self._state_value_dict = mdp.mdp_plan.state_values
+        self._action_value_dict = mdp.mdp_plan.action_values
 
-#     def __call__(self, state: State) -> Union[Categorical[Action], Action]:
-#         qvalues = self.action_values(state)
-#         actions, values = zip(*qvalues.items())
-#         if self.inverse_temperature == float('inf') and self.random_action_prob == 0:
-#             max_value = max(values)
-#             return Categorical([a for a in actions if qvalues[a] == max_value])
-#         probs = np.exp((np.array(values) - max(values))*self.inverse_temperature)
-#         probs /= probs.sum()
-#         probs = self.random_action_prob/len(actions) + (1-self.random_action_prob)*probs
-#         return Categorical(actions, probabilities=probs)
+
+    def __call__(self, state: Tuple[frozendict]):
+        qvalues = self.action_values(state)
+        actions, values = zip(*qvalues.items())
+        if not (self.inverse_temperature == float('inf') and self.random_action_prob == 0):
+            probs = np.exp((np.array(values) - max(values))*self.inverse_temperature)
+            probs /= probs.sum()
+            probs = self.random_action_prob/len(actions) + (1-self.random_action_prob)*probs
+            values = probs
+        max_value = max(values)
+        logging.debug("Action values: "+str(list(zip(actions, values))))
+        return [a for a, v in zip(actions, values) if v == max_value]
     
-#     def _update_values_from(self, state: State):
-#         res = value_iteration(mdp=self.mdp, initial_states=[state], iterations=1000)
-#         self._state_value_dict.update(res.state_values)
-#         self._action_value_dict.update(res.action_values)
+
+    def action_values(self, state: Tuple[frozendict]) -> dict[int, float]:
+        try:
+            return self._action_value_dict[state]
+        except KeyError:
+            raise KeyError("State "+str(state)+" not explored.")
     
-#     def action_values(self, state: State) -> dict[Action, float]:
-#         try:
-#             return self._action_value_dict[state]
-#         except KeyError:
-#             self._update_values_from(state)
-#             return self._action_value_dict[state]
+
+    def state_value(self, state: Tuple[frozendict]) -> float:
+        try:
+            return self._state_value_dict[state]
+        except KeyError:
+            raise KeyError("State "+str(state)+" not explored.")
     
-#     def state_value(self, state: State) -> float:
-#         try:
-#             return self._state_value_dict[state]
-#         except KeyError:
-#             self._update_values_from(state)
-#             return self._state_value_dict[state]
+
+    def __hash__(self):
+        return hash((self.mdp, self.inverse_temperature, self.random_action_prob))
     
-#     def __hash__(self):
-#         return hash((self.mdp, self.inverse_temperature, self.random_action_prob))
-    
-#     def __eq__(self, value: object) -> bool:
-#         if not isinstance(value, OptimalPolicy):
-#             return False
-#         return self.mdp == value.mdp and \
-#             self.inverse_temperature == value.inverse_temperature and \
-#             self.random_action_prob == value.random_action_prob
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, OptimalPolicy):
+            return False
+        return self.mdp == value.mdp and \
+            self.inverse_temperature == value.inverse_temperature and \
+            self.random_action_prob == value.random_action_prob
     
 
 
 
 @dataclasses.dataclass
 class MDPTable():
-    transition: dict[dict[Tuple[frozendict, int], frozendict], float]
-    absorption: dict[frozendict, bool]
-    reward: dict[Tuple[frozendict, int, frozendict], float]
-    state_list: Sequence[frozendict]
+    transition: dict[dict[Tuple[Tuple[frozendict], int], Tuple[frozendict]], float]
+    absorption: dict[Tuple[frozendict], bool]
+    reward: dict[Tuple[Tuple[frozendict], int], float]
+    state_list: Sequence[Tuple[frozendict]]
     action_list: Sequence[int]
+
 
 @dataclasses.dataclass
 class MDPMatrix():
@@ -452,10 +523,11 @@ class MDPMatrix():
     reward: np.ndarray
     absorbing_state_mask: np.ndarray
     discount: float
-    state_list: Sequence[frozendict]
+    state_list: Sequence[Tuple[frozendict]]
     action_list: Sequence[int]
+
 
 @dataclasses.dataclass
 class PlanningResult():
-    state_values: dict[frozendict, float]
-    action_values: dict[frozendict, dict[int, float]]
+    state_values: dict[Tuple[frozendict], float]
+    action_values: dict[Tuple[frozendict], dict[int, float]]
