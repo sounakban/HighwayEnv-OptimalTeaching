@@ -154,9 +154,7 @@ This code has been tested with Python 3.12
 
 to install dependencies (expect pytorch) run
 
-```
-pip install -r /path/to/requirements.txt
-```
+`pip install -r /path/to/requirements.txt`
 
 Install pytorch version based on system configuration. The correct installation command can be found [here](https://pytorch.org/get-started/locally/).
 
