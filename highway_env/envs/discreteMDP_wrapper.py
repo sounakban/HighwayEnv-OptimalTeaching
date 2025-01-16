@@ -25,6 +25,7 @@ from typing import TypeVar, Generic, Sequence, Set, Hashable, Union, Callable, T
 
 @dataclasses.dataclass
 class MDPTable():
+    start_state: Tuple[frozendict]
     transition: dict[dict[Tuple[Tuple[frozendict], int], Tuple[frozendict]], float]
     absorption: dict[Tuple[frozendict], bool]
     reward: dict[Tuple[Tuple[frozendict], int], float]
@@ -34,6 +35,7 @@ class MDPTable():
 
 @dataclasses.dataclass
 class MDPMatrix():
+    start_state: Tuple[frozendict]
     transition: np.ndarray
     reward: np.ndarray
     absorbing_state_mask: np.ndarray
@@ -44,13 +46,14 @@ class MDPMatrix():
 
 @dataclasses.dataclass
 class PlanningResult():
+    start_state: Tuple[frozendict]
     state_values: dict[Tuple[frozendict], float]
     action_values: dict[Tuple[frozendict], dict[int, float]]
 
 
 
 
-######################### DEFINE GYM-MDP BASE CLASS #########################
+######################### DEFINE GYM-MDP WRAPPER BASE CLASS #########################
 
 class GymDiscreteMDP:
     max_states = int(1e6)
@@ -64,13 +67,31 @@ class GymDiscreteMDP:
         if "config" in kwargs:
             self.config = kwargs.get("config", None)
         self._env = gym.make(*args, **kwargs)
-        self._first_obs, self._first_info = self._env.reset()
+        self._first_state, self._first_info = self._env.reset()
+        self._first_state = GymDiscreteMDP.to_hashable_state(self._first_state, self.config["observation"]["features"])
+        self._current_state = copy.deepcopy(self._first_state)
         action_space = self._env.action_space
         if isinstance(action_space, gym.spaces.discrete.Discrete):
             self._actions = range(action_space.start, action_space.n)
         else:
             raise NotImplementedError("Only discrete action spaces are currently supported")
             # |Can later be extended for other gym actionspaces
+       
+
+    @property
+    def first_state(self): 
+        """
+        Return the current MDPtable object.
+        """
+        return self._first_state
+       
+
+    @property
+    def current_state(self): 
+        """
+        Return the current MDPtable object.
+        """
+        return self._current_state
 
 
     @property
@@ -130,15 +151,17 @@ class GymDiscreteMDP:
             action (int): The action to be taken expressed by an integer number.
         """
         obs, reward, done, truncated, info = self._env.step(action)
+        self._current_state = obs
         logging.debug(obs)
         return (obs, 1, reward, done, truncated, info)
     
 
-    def create_MDPTable(self, transition, absorption, reward, state_list, action_list):
+    def create_MDPTable(self, start_state, transition, absorption, reward, state_list, action_list):
         """
         Set the current MDPtable object.
         """
-        self._mdp_tables = MDPTable(transition=transition, absorption=absorption, reward=reward, state_list=state_list, action_list=action_list)
+        self._mdp_tables = MDPTable(start_state=start_state, transition=transition, absorption=absorption, reward=reward, state_list=state_list, action_list=action_list)
+        return self._mdp_tables
    
 
     def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0) -> MDPTable:
@@ -160,6 +183,9 @@ class GymDiscreteMDP:
         Parameters:
             None
         """
+        if (self._mdp_matrices and self._mdp_matrices.start_state == self._current_state):
+            # If it was already calculated for the current state return existing matrix
+            return self._mdp_matrices
         tb = self._mdp_tables
         if tb == None:
             raise ValueError("MDP tables not set up yet.")
@@ -174,6 +200,7 @@ class GymDiscreteMDP:
         for (s, a), r in tb.reward.items():
             reward_mat[state_idx[s], action_idx[a]] = r
         self._mdp_matrices = MDPMatrix(
+            start_state=tb.start_state,
             transition=transition_mat,
             reward=reward_mat,
             absorbing_state_mask=absorbing_vec,
@@ -198,14 +225,17 @@ class GymDiscreteMDP:
             value_epsilon (float): Tollerance for when to terminate iteration process
                                     based on delta between consecutive iterations (default = 1e-6)
         """
-        m = self.get_MDPmatrices()
+        if (self._mdp_plan and self._mdp_plan.start_state == self._current_state):
+            # If it was already calculated for the current state return existing plan
+            return self._mdp_plan
+        mat = self.get_MDPmatrices()
         # if np.all(m.absorbing_state_mask == False) and m.discount == 1:
         #     raise ValueError("No absorbing states found in MDP with discount factor 1")
-        value = np.zeros(len(m.state_list))
-        value_ = np.zeros(len(m.state_list))
-        qvalues = np.zeros((len(m.state_list), len(m.action_list)))
+        value = np.zeros(len(mat.state_list))
+        value_ = np.zeros(len(mat.state_list))
+        qvalues = np.zeros((len(mat.state_list), len(mat.action_list)))
         for i in range(iterations):
-            qvalues[:] = m.reward + m.discount*np.einsum("san,n->sa", m.transition, value)
+            qvalues[:] = mat.reward + mat.discount*np.einsum("san,n->sa", mat.transition, value)
             # qvalues[m.absorbing_state_mask, :] = 0
             value_[:] = qvalues.max(axis=1)
             max_residual = np.abs(value - value_).max()
@@ -214,12 +244,13 @@ class GymDiscreteMDP:
             value[:] = value_
         assert max_residual < value_epsilon, "Value iteration did not converge"
         action_values = {}
-        for s, q in zip(m.state_list, qvalues):
-            action_values[s] = dict(zip(m.action_list, q))
+        for s, q in zip(mat.state_list, qvalues):
+            action_values[s] = dict(zip(mat.action_list, q))
         logging.debug(value)
         logging.debug(action_values)
         self._mdp_plan = PlanningResult(
-            state_values=dict(zip(m.state_list, value.tolist())),
+            start_state=mat.start_state,
+            state_values=dict(zip(mat.state_list, value.tolist())),
             action_values=action_values
         )
         return self._mdp_plan
@@ -240,8 +271,10 @@ class GymDiscreteMDP:
     def to_hashable_state(cls, obs, obs_config):
         """
         Create hashable (discretized) variable using environment state information, for MDP planning.
+        The current implementation does nothing, as the implementation of thi function is strictly 
+            evironment dependant
         """
-        raise NotImplementedError("Please Implement this method")
+        return obs
 
 
     @classmethod
@@ -264,7 +297,7 @@ class GymDiscreteMDP:
 
 
 
-######################### DEFINE HIGHWAYENV GYM-MDP CLASS #########################
+######################### DEFINE HIGHWAYENV GYM-MDP WRAPPER CLASS #########################
 
 class HighwayDiscreteMDP(GymDiscreteMDP):
     '''
@@ -281,8 +314,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                   and specify (at least) the following features in config:\n \
                   \tpresence, x, y, vx, vy, heading.")
         super().__init__(*args, **kwargs)
-        self._initial_state = HighwayDiscreteMDP.to_hashable_state(self._first_obs, self.config["observation"]["features"])
-        self._curr_state = copy.deepcopy(self._initial_state)
+        self._first_state = HighwayDiscreteMDP.to_hashable_state(self._first_state, self.config["observation"]["features"])
+        self._current_state = copy.deepcopy(self._first_state)
         # self.action_dict = self._env.unwrapped.action_type.actions_indexes
         # |Set perception distance to maximum. So, state of all cars in the environment 
         # |are available irrespective of whether they are in the visibility window.
@@ -292,41 +325,28 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
     @property
     def env(self):
         return copy.deepcopy(self._env)
-       
-
-    @property
-    def initial_state(self): 
-        """
-        Return the current MDPtable object.
-        """
-        return self._initial_state
-       
-
-    @property
-    def current_state(self): 
-        """
-        Return the current MDPtable object.
-        """
-        return self._current_state
     
 
     def default_config(self):
         return {
         "observation": {
+            "vehicles_count": 50,   # Number of vehicles to show in the observation. Keep greater than value 
+                                    #   of vehicles out outside obervation dictionary to observe all vehicles
+                                    #   in the environment.
             "type": "Kinematics",
-            "vehicles_count": 50,
             "features": ["presence", "x", "y", "vx", "vy", "heading"],
-            "normalize": False,
-            "absolute": True,
+            "normalize": False, # Normalize object coordinates
+            "absolute": True,   # Provide absolute coordinate of vehicles
             "order": "sorted",
             "observe_intentions": False,
-            "include_obstacles": True
+            "include_obstacles": True,
+            "see_behind": True  # Report vehicles behind the ego vehicle
             }
         }
 
 
     def get_env_properties(self):
-        return self.initial_state, self.actions
+        return self._first_state, self._current_state, self.actions
 
 
     def step(self, action):
@@ -338,9 +358,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
         """
         obs, reward, done, truncated, info = self._env.step(action)
         logging.debug(obs)
-        next_state = HighwayDiscreteMDP.to_hashable_state(obs, self.config["observation"]["features"])
-        self._current_state = next_state    # Update intital state to reflect updated environment state.
-        return next_state, reward, done, truncated, info
+        self._current_state = HighwayDiscreteMDP.to_hashable_state(obs, self.config["observation"]["features"])
+        return self._current_state, reward, done, truncated, info
    
 
     def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0):
@@ -352,7 +371,10 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             unknown_reward (float): reward value set for state-action pairs which are left
                                     unexplored due to depth constraint (default = 0)
         """
-        start_env = (self.initial_state, 0, self._env)
+        if (self._mdp_tables and self._mdp_tables.start_state == self._current_state):
+            # If it was already calculated for the current state return existing table
+            return self._mdp_tables
+        start_env = (self._current_state, 0, self._env)
         visited = set()
         transitions = {}
         rewards = {}
@@ -371,7 +393,7 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                     return_vals = pool.map(functools.partial(HighwayDiscreteMDP.simulateAction, 
                                                              sim_env=curr_env, 
                                                              obsrv_features=self.config["observation"]["features"]), self.actions)
-                # OR Sequential execution
+                # OR Sequential execution (useful for bug-fixing)
                 # return_vals = []
                 # for actn in self.actions:
                 #     return_vals.append(HighwayDiscreteMDP.simulateAction(actn, sim_env=curr_env, obsrv_features=self.config["observation"]["features"]))
@@ -407,8 +429,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             # close all duplicate environments
             curr_env.close()
         env2close = set()   # Close ununsed environments at the end of the loop
-        self.create_MDPTable(transition=transitions, absorption=absorption, reward=rewards, 
-                             state_list=visited, action_list=set(self.actions))
+        return self.create_MDPTable(start_state=self._current_state, transition=transitions, absorption=absorption, reward=rewards, 
+                                    state_list=visited, action_list=set(self.actions))
         
 
     def copy_class_with_env(self, env):
@@ -475,7 +497,7 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
         """
         if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
             raise TypeError("Environent parameter is not an instance of GymDiscreteMDP")
-        # logging.debug(envMDP_copy.env.unwrapped.road.vehicles[0])
+        # logging.debug(sim_env.env.unwrapped.road.vehicles[0])
         env_copy = copy.deepcopy(sim_env)
         obs, reward, done, truncated, info = env_copy.step(action)
         logging.debug(obs)
