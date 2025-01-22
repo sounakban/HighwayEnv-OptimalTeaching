@@ -4,6 +4,7 @@ import highway_env
 import dataclasses
 from frozendict import frozendict
 import numpy as np
+from math import isnan
 import copy
 
 from pathos.multiprocessing import ProcessingPool as Pool    # Can run multiprocessing in interactive shell
@@ -22,6 +23,9 @@ from typing import TypeVar, Generic, Sequence, Set, Hashable, Union, Callable, T
 
 
 ######################### DEFINE NECESSARY DATACLASSES #########################
+
+State = Tuple[frozendict]
+Action = int
 
 @dataclasses.dataclass
 class MDPTable():
@@ -474,7 +478,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             veh = {}
             veh["position"] = tuple(np.round((feature_vals["x"],feature_vals["y"]), 2))
             veh["speed"] = tuple(np.round((feature_vals["vx"],feature_vals["vy"]), 2))
-            veh["heading"] = np.round(feature_vals["heading"], 3)
+            # Replace NaN values of headings with -1, allows comparison of states.
+            veh["heading"] = -1 if(isnan(feature_vals["heading"])) else np.round(feature_vals["heading"], 3)
             road_objects.append(frozendict(veh))
         return tuple(road_objects)
 
