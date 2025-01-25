@@ -5,7 +5,7 @@ import dataclasses
 from frozendict import frozendict
 import numpy as np
 from math import isnan
-import copy
+from copy import deepcopy
 
 from pathos.multiprocessing import ProcessingPool as Pool    # Can run multiprocessing in interactive shell
 # from multiprocessing import Pool
@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import multiprocessing as mp
 process_count = (mp.cpu_count()-2)
 import functools
+from functools import lru_cache
 
 import warnings
 import logging
@@ -73,7 +74,7 @@ class GymDiscreteMDP:
         self._env = gym.make(*args, **kwargs)
         self._first_state, self._first_info = self._env.reset()
         self._first_state = GymDiscreteMDP.to_hashable_state(self._first_state, self.config["observation"]["features"])
-        self._current_state = copy.deepcopy(self._first_state)
+        self._current_state = deepcopy(self._first_state)
         action_space = self._env.action_space
         if isinstance(action_space, gym.spaces.discrete.Discrete):
             self._actions = range(action_space.start, action_space.n)
@@ -137,10 +138,14 @@ class GymDiscreteMDP:
     @property
     def env(self):
         """
-        Return a copy of the current state of the environment,
-        so it can be set back to simulate the outcome of various actions.
+        Return the current environment object.
         """
-        raise NotImplementedError("Please Implement this method")
+        return self._env
+    
+    def get_copy(self):
+        """Returns a copy of the current instance of the class to perform actions 
+        without affecting the current state of the class"""
+        return deepcopy(self)
 
 
     def step(self, action: int):
@@ -319,17 +324,12 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                   \tpresence, x, y, vx, vy, heading.")
         super().__init__(*args, **kwargs)
         self._first_state = HighwayDiscreteMDP.to_hashable_state(self._first_state, self.config["observation"]["features"])
-        self._current_state = copy.deepcopy(self._first_state)
+        self._current_state = deepcopy(self._first_state)
         # self.action_dict = self._env.unwrapped.action_type.actions_indexes
         # |Set perception distance to maximum. So, state of all cars in the environment 
         # |are available irrespective of whether they are in the visibility window.
         self._env.unwrapped.PERCEPTION_DISTANCE = float('inf')
-    
-    
-    @property
-    def env(self):
-        return copy.deepcopy(self._env)
-    
+        
 
     def default_config(self):
         return {
@@ -376,7 +376,7 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                                     unexplored due to depth constraint (default = 0)
         """
         if (self._mdp_tables and self._mdp_tables.start_state == self._current_state):
-            # If it was already calculated for the current state return existing table
+            # |If it was already calculated for the current state return existing table
             return self._mdp_tables
         start_env = (self._current_state, 0, self._env)
         visited = set()
@@ -392,81 +392,82 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                 raise ValueError(f"Maximum number of states reached ({self.max_states})")
             env2close.add(curr_env)
             if depth < max_depth:
-                # Parellel execution
+                # |Parellel execution
                 with Pool(process_count) as pool:
                     return_vals = pool.map(functools.partial(HighwayDiscreteMDP.simulateAction, 
                                                              sim_env=curr_env, 
-                                                             obsrv_features=self.config["observation"]["features"]), self.actions)
-                # OR Sequential execution (useful for bug-fixing)
+                                                             obsrv_features=tuple(self.config["observation"]["features"])), self.actions)
+                # |OR Sequential execution (useful for bug-fixing)
                 # return_vals = []
                 # for actn in self.actions:
                 #     return_vals.append(HighwayDiscreteMDP.simulateAction(actn, sim_env=curr_env, obsrv_features=self.config["observation"]["features"]))
                 for action, next_state, trans_prob, reward, done, truncated, info, updated_env in return_vals:
                     logging.debug(str(state[0]) + ' | ' + str(action) + ' | ' + str(next_state[0]))
-                    #2# Populate transitions table
+                    #2# |Populate transitions table
                     if (state, action) not in transitions:
                         transitions[(state, action)] = {}
                     if next_state not in transitions[(state, action)]:
                         transitions[(state, action)][next_state] = trans_prob
-                    #2# Populate reward functions
+                    #2# |Populate reward functions
                     if (state[0], action) in rewards:
                         rewards[(state, action)] += reward * trans_prob
                     else:
                         rewards[(state, action)] = reward * trans_prob
-                    #2# set absorption states
+                    #2# |Set absorption states
                     absorption[next_state] = done or truncated
-                    #2# Populate visited
+                    #2# |Populate visited
                     if next_state not in visited:
                         frontier.add((next_state, depth + 1, updated_env))
                     else:
                         updated_env.close()
             else:
-                #2# Set rewards for unexplored state-action pairs to 0
+                #2# |Set rewards for unexplored state-action pairs to 0
                 for action in self.actions:
                     if not (state, action) in rewards:
                         rewards[(state, action)] = unknown_reward
             MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
                         " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
             logging.info(MDPstatus)
-        env2close.discard(start_env[2]) #Keep the first step active
+        env2close.discard(start_env[2]) # Keep the first step active
         for curr_env in env2close:
-            # close all duplicate environments
+            # |Close all duplicate environments
             curr_env.close()
         env2close = set()   # Close ununsed environments at the end of the loop
         return self.create_MDPTable(start_state=self._current_state, transition=transitions, absorption=absorption, reward=rewards, 
                                     state_list=visited, action_list=set(self.actions))
         
 
-    def copy_class_with_env(self, env):
-        curr_copy = copy.deepcopy(self)
-        curr_copy.env = env
-        return curr_copy
-
-    def get_construals_singleobj(self):        
-        veh_list = self._env.unwrapped.road.vehicles[:]     # Only contains list of vehicles
+    def get_construals_singleobj(self):
+        '''
+        Returns a list of environments each containing the ego vehicle along with a single object or vehicle.
+        Te first environment in the list '''
+        veh_list = self._env.unwrapped.road.vehicles[:]         # Only contains list of vehicles
         ego_veh = veh_list[0]
-        veh_list = veh_list[1:]                             # Update list to only contain ado vehicles
-        obj_list = veh_list[:]                              # Contains list of all objects
-        obj_list.extend(self._env.unwrapped.road.objects)
+        veh_list = set(veh_list[1:])                            # Update list to only contain ado vehicles
+        obj_list = set(self._env.unwrapped.road.objects)        # Contains list of all objects
+        obj_list = obj_list.union(veh_list)                     # Add vehicles to object list
+        # print(obj_list, veh_list)
         contrued_envs = []
         # Add an empty environment
-        env_copy = self.env
-        env_copy.unwrapped.road.vehicles = [ego_veh]
-        env_copy.unwrapped.road.objects = []
-        contrued_envs.append(self.copy_class_with_env(env_copy))
+        curr_construal = self.get_copy()
+        temp_env = curr_construal.env
+        temp_env.unwrapped.road.vehicles = [ego_veh]
+        temp_env.unwrapped.road.objects = []
+        contrued_envs.append(curr_construal)
         # Add other environments
         for obj in obj_list:
-            env_copy = self.env
+            curr_construal = self.get_copy()
+            temp_env = curr_construal.env
             if obj in veh_list:
                 # Object is a vehicle
-                env_copy.unwrapped.road.vehicles = [ego_veh, obj]
-                env_copy.unwrapped.road.objects = []
+                temp_env.unwrapped.road.vehicles = [ego_veh, obj]
+                temp_env.unwrapped.road.objects = []
             else:
                 # Object is roadobject
-                env_copy.unwrapped.road.vehicles = [ego_veh]
-                env_copy.unwrapped.road.objects = [obj]
+                temp_env.unwrapped.road.vehicles = [ego_veh]
+                temp_env.unwrapped.road.objects = [obj]
             # env_copy.unwrapped.road.vehicles.remove(veh)
-            contrued_envs.append(self.copy_class_with_env(env_copy))
+            contrued_envs.append(curr_construal)
         return contrued_envs
 
 
@@ -485,6 +486,7 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
 
 
     @classmethod
+    @lru_cache(maxsize=10000)
     def simulateAction(cls, action, sim_env, obsrv_features):
         """
         Given an instance of a gym environment and an action to perform in the environment, the function
@@ -503,7 +505,7 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
         if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
             raise TypeError("Environent parameter is not an instance of GymDiscreteMDP")
         # logging.debug(sim_env.env.unwrapped.road.vehicles[0])
-        env_copy = copy.deepcopy(sim_env)
+        env_copy = deepcopy(sim_env)
         obs, reward, done, truncated, info = env_copy.step(action)
         logging.debug(obs)
         next_state = HighwayDiscreteMDP.to_hashable_state(obs, obsrv_features)
