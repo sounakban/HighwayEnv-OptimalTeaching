@@ -249,8 +249,7 @@ class Ice(RoadObject):
     """Ice on road that leads to erratic behavior of car."""
 
     def __init__(
-        self, road, position: Sequence[float]#, heading: float = 0, speed: float = 0
-    ):
+        self, road, position: Sequence[float]):
         super().__init__(road, position, heading = 0, speed = 0)
         self.solid = False
 
@@ -278,6 +277,7 @@ class Ice(RoadObject):
         :return: A vehicle with random position and/or speed
         """
         # TODO: Incomplete funtion definition
+        speed = 0
         _from = lane_from or road.np_random.choice(list(road.network.graph.keys()))
         _to = lane_to or road.np_random.choice(list(road.network.graph[_from].keys()))
         _id = lane_id or road.np_random.choice(len(road.network.graph[_from][_to]))
@@ -303,13 +303,13 @@ class Ice(RoadObject):
             * np.exp(-5 / 40 * len(road.network.graph[_from][_to]))
         )
         x0 = (
-            np.max([lane.local_coordinates(v.position)[0] for v in road.vehicles])
+            np.max([lane.local_coordinates(ic.position)[0] for ic in road.objects])
             if len(road.vehicles)
             else 3 * offset
         )
         x0 += offset * road.np_random.uniform(0.9, 1.1)
-        v = cls(road, lane.position(x0, 0), lane.heading_at(x0), speed)
-        return v
+        ic = cls(road, lane.position(x0, 0))
+        return ic
 
 
 

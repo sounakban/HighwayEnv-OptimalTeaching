@@ -105,17 +105,14 @@ class HighwayEnvIcy(AbstractEnv):
             ice.diagonal = np.sqrt(ice.LENGTH**2 + ice.WIDTH**2)
             self.road.objects.append(ice)
         # TODO: Add logic for randomizing ice locations
-        # width, height = 70, 42
-        # for y in [-height / 2, height / 2]:
-        #     obstacle = Obstacle(self.road, [0, y])
-        #     obstacle.LENGTH, obstacle.WIDTH = (width, 1)
-        #     obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
-        #     self.road.objects.append(obstacle)
-        # for x in [-width / 2, width / 2]:
-        #     obstacle = Obstacle(self.road, [x, 0], heading=np.pi / 2)
-        #     obstacle.LENGTH, obstacle.WIDTH = (height, 1)
-        #     obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
-        #     self.road.objects.append(obstacle)
+        # length, width = 15, 5
+        # for _ in range(self.config["ice_count"]):
+        #     ice = Ice1.create_random(
+        #             self.road, spacing=1 / self.config["vehicles_density"]
+        #         )
+        #     ice.LENGTH, ice.WIDTH = (length, width)
+        #     ice.diagonal = np.sqrt(ice.LENGTH**2 + ice.WIDTH**2)
+        #     self.road.objects.append(ice)
 
 
 
@@ -188,8 +185,39 @@ class HighwayEnvIcyFast(HighwayEnvIcy):
             {
                 "simulation_frequency": 5,
                 "lanes_count": 3,
-                "vehicles_count": 20,
+                # "vehicles_count": 20,
                 "duration": 30,  # [s]
+                "ego_spacing": 1.5,
+            }
+        )
+        return cfg
+
+    def _create_vehicles(self) -> None:
+        super()._create_vehicles()
+        # Disable collision check for uncontrolled vehicles
+        for vehicle in self.road.vehicles:
+            if vehicle not in self.controlled_vehicles:
+                vehicle.check_collisions = False
+
+
+
+class HighwayEnvIcyCustom(HighwayEnvIcy):
+    """
+    A variant of highway-v0 with custom execution configurations:
+        - lower simulation frequency
+        - fewer vehicles in the scene (and fewer lanes, shorter episode duration)
+        - only check collision of controlled vehicles with others
+    """
+
+    @classmethod
+    def default_config(cls) -> dict:
+        cfg = super().default_config()
+        cfg.update(
+            {
+                "simulation_frequency": 5,
+                # "lanes_count": 3,
+                # "vehicles_count": 20,
+                # "duration": 30,  # [s]
                 "ego_spacing": 1.5,
             }
         )

@@ -338,7 +338,7 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                                     #   of vehicles out outside obervation dictionary to observe all vehicles
                                     #   in the environment.
             "type": "Kinematics",
-            "features": ["presence", "x", "y", "vx", "vy", "heading"],
+            "features": ["presence", "x", "y", "vx", "vy"],
             "normalize": False, # Normalize object coordinates
             "absolute": True,   # Provide absolute coordinate of vehicles
             "order": "sorted",
@@ -415,8 +415,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                         rewards[(state, action)] = reward * trans_prob
                     #2# |Set absorption states
                     absorption[next_state] = done or truncated
-                    #2# |Populate visited
-                    if next_state not in visited:
+                    #2# |Populate frontier
+                    if (next_state not in visited) and not truncated:
                         frontier.add((next_state, depth + 1, updated_env))
                     else:
                         updated_env.close()
@@ -425,9 +425,10 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                 for action in self.actions:
                     if not (state, action) in rewards:
                         rewards[(state, action)] = unknown_reward
-            MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
-                        " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
-            logging.info(MDPstatus)
+        # |Indent the lines below (logging) inside for more detailed updates on MDP status
+        MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
+                    " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
+        logging.info(MDPstatus)
         env2close.discard(start_env[2]) # Keep the first step active
         for curr_env in env2close:
             # |Close all duplicate environments

@@ -52,6 +52,11 @@ def _register_highway_envs():
         entry_point="highway_env.envs.highway_env_icy:HighwayEnvIcyFast",
     )
 
+    register(
+        id="highway-icy-custom-v0",
+        entry_point="highway_env.envs.highway_env_icy:HighwayEnvIcyCustom",
+    )
+
     # intersection_env.py
     register(
         id="intersection-v0",
