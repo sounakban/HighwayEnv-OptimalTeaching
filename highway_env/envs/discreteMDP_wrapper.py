@@ -14,6 +14,7 @@ import multiprocessing as mp
 process_count = (mp.cpu_count()-2)
 import functools
 from functools import lru_cache
+import itertools as it
 
 import warnings
 import logging
@@ -148,21 +149,36 @@ class GymDiscreteMDP:
         return deepcopy(self)
 
 
-    def step(self, action: int):
+    # def step(self, action: int):
+    #     """
+    #     The function takes an action and returns MDP-compatible state information.
+    #     Can be overridden based on simulation-specific properties.
+
+    #     This function returns 1 for transition probability since a standard gym 
+    #     environment is completely deterministic.
+
+    #     Args:
+    #         action (int): The action to be taken expressed by an integer number.
+    #     """
+    #     obs, reward, done, truncated, info = self._env.step(action)
+    #     self._current_state = obs
+    #     logging.debug(obs)
+    #     return (obs, 1, reward, done, truncated, info)
+
+
+    def step(self, action):
         """
         The function takes an action and returns MDP-compatible state information.
-        Can be overridden based on simulation-specific properties.
-
-        This function returns 1 for transition probability since a standard gym 
-        environment is completely deterministic.
 
         Args:
             action (int): The action to be taken expressed by an integer number.
         """
         obs, reward, done, truncated, info = self._env.step(action)
-        self._current_state = obs
         logging.debug(obs)
-        return (obs, 1, reward, done, truncated, info)
+        # |Here, the classmethod 'to_hashable_state' is being called with self instead of the class name to allow the code 
+        # | to call the overridden 'to_hashable_state' method implemented in any child class.
+        self._current_state = self.to_hashable_state(obs, self.config["observation"]["features"])
+        return self._current_state, reward, done, truncated, info
     
 
     def create_MDPTable(self, start_state, transition, absorption, reward, state_list, action_list):
@@ -173,16 +189,181 @@ class GymDiscreteMDP:
         return self._mdp_tables
    
 
-    def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0) -> MDPTable:
+    # def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0) -> MDPTable:
+    #     """
+    #     Code to set up MDP tables
+
+    #     Parameters:
+    #         max_depth (int): The number of steps to plan ahead (default = 2)
+    #         unknown_reward (float): reward value set for state-action pairs which are left
+    #                                 unexplored due to depth constraint (default = 0)
+    #     """        
+    #     raise NotImplementedError("Please Implement this method")
+   
+
+    def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0):
         """
-        Code to set up MDP tables
+        Code to set up MDP tables. Can perform serial or parallel execution of each of the 6 actions 
+            in a given environment.
 
         Parameters:
             max_depth (int): The number of steps to plan ahead (default = 2)
             unknown_reward (float): reward value set for state-action pairs which are left
                                     unexplored due to depth constraint (default = 0)
-        """        
-        raise NotImplementedError("Please Implement this method")
+        """
+        if (self._mdp_tables and self._mdp_tables.start_state == self._current_state):
+            # |If it was already calculated for the current state return existing table
+            return self._mdp_tables
+        start_env = (self._current_state, 0, self._env)
+        visited = set()
+        transitions = {}
+        rewards = {}
+        absorption = {}
+        frontier = {start_env}
+        env2close = set()   # Maintain list of environments to close
+        while frontier:
+            state, depth, curr_env = frontier.pop()
+            visited.add(state)
+            if len(visited) >= self.max_states:
+                raise ValueError(f"Maximum number of states reached ({self.max_states})")
+            env2close.add(curr_env)
+            if depth < max_depth:
+                # |Parellel execution
+                with Pool(process_count) as pool:
+                    # |Here, the classmethod 'simulateAction' is being called with self instead of the class name to allow the code 
+                    # | to call the overridden 'simulateAction' method implemented in any child class.
+                    return_vals = pool.map(functools.partial(self.simulateAction, 
+                                                             sim_env=curr_env, 
+                                                             obsrv_features=tuple(self.config["observation"]["features"])), self.actions)
+                # |OR Sequential execution (useful for bug-fixing)
+                # return_vals = []
+                # for actn in self.actions:
+                #     return_vals.append(HighwayDiscreteMDP.simulateAction(actn, sim_env=curr_env, obsrv_features=self.config["observation"]["features"]))
+                for action, next_state, trans_prob, reward, done, truncated, info, updated_env in return_vals:
+                    logging.debug(str(state[0]) + ' | ' + str(action) + ' | ' + str(next_state[0]))
+                    #2# |Populate transitions table
+                    if (state, action) not in transitions:
+                        transitions[(state, action)] = {}
+                    if next_state not in transitions[(state, action)]:
+                        transitions[(state, action)][next_state] = trans_prob
+                    #2# |Populate reward functions
+                    if (state[0], action) in rewards:
+                        rewards[(state, action)] += reward * trans_prob
+                    else:
+                        rewards[(state, action)] = reward * trans_prob
+                    #2# |Set absorption states
+                    absorption[next_state] = done or truncated
+                    #2# |Populate frontier
+                    if (next_state not in visited) and not truncated:
+                        frontier.add((next_state, depth + 1, updated_env))
+                    else:
+                        updated_env.close()
+            else:
+                #2# |Set rewards for unexplored state-action pairs to 0
+                for action in self.actions:
+                    if not (state, action) in rewards:
+                        rewards[(state, action)] = unknown_reward
+        # |Indent the lines below (logging) inside for more detailed updates on MDP status
+        MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
+                    " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
+        logging.info(MDPstatus)
+        env2close.discard(start_env[2]) # Keep the first step active
+        for curr_env in env2close:
+            # |Close all duplicate environments
+            curr_env.close()
+        env2close = set()   # Close ununsed environments at the end of the loop
+        return self.create_MDPTable(start_state=self._current_state, transition=transitions, absorption=absorption, reward=rewards, 
+                                    state_list=visited, action_list=set(self.actions))
+    
+   
+    def populate_MDPtable_async(self, max_depth: int = 2, unknown_reward: float = 0):
+        """
+        Code to set up MDP tables which runs multiple environments in parallel for each permutation
+            of action sequence (determined by the depth of execution).
+
+        Parameters:
+            max_depth (int): The number of steps to plan ahead (default = 2)
+            unknown_reward (float): reward value set for state-action pairs which are left
+                                    unexplored due to depth constraint (default = 0)
+        """
+        if (self._mdp_tables and self._mdp_tables.start_state == self._current_state):
+            # |If it was already calculated for the current state return existing table
+            return self._mdp_tables
+        # |Generate all permutations of action sequences
+        actn_seq_permutations = it.permutations(self.actions, max_depth)
+        # |Parellel execution
+        results_cache = mp.Manager().dict()
+        with Pool(process_count) as pool:
+            return_vals = pool.map(functools.partial(self.simulateAction_async, 
+                                                    sim_env=self._env, 
+                                                    obsrv_features=tuple(self.config["observation"]["features"]),
+                                                    results_cache = results_cache,
+                                                    curr_state = self._current_state),
+                                    actn_seq_permutations)
+        # TODO: Complete writing this code using the reference code below
+        return 0
+        ## REFERENCE CODE ##
+        if (self._mdp_tables and self._mdp_tables.start_state == self._current_state):
+            # |If it was already calculated for the current state return existing table
+            return self._mdp_tables
+        start_env = (self._current_state, 0, self._env)
+        visited = set()
+        transitions = {}
+        rewards = {}
+        absorption = {}
+        frontier = {start_env}
+        env2close = set()   # Maintain list of environments to close
+        while frontier:
+            state, depth, curr_env = frontier.pop()
+            visited.add(state)
+            if len(visited) >= self.max_states:
+                raise ValueError(f"Maximum number of states reached ({self.max_states})")
+            env2close.add(curr_env)
+            if depth < max_depth:
+                # |Parellel execution
+                with Pool(process_count) as pool:
+                    return_vals = pool.map(functools.partial(HighwayDiscreteMDP.simulateAction, 
+                                                             sim_env=curr_env, 
+                                                             obsrv_features=tuple(self.config["observation"]["features"])), self.actions)
+                # |OR Sequential execution (useful for bug-fixing)
+                # return_vals = []
+                # for actn in self.actions:
+                #     return_vals.append(HighwayDiscreteMDP.simulateAction(actn, sim_env=curr_env, obsrv_features=self.config["observation"]["features"]))
+                for action, next_state, trans_prob, reward, done, truncated, info, updated_env in return_vals:
+                    logging.debug(str(state[0]) + ' | ' + str(action) + ' | ' + str(next_state[0]))
+                    #2# |Populate transitions table
+                    if (state, action) not in transitions:
+                        transitions[(state, action)] = {}
+                    if next_state not in transitions[(state, action)]:
+                        transitions[(state, action)][next_state] = trans_prob
+                    #2# |Populate reward functions
+                    if (state[0], action) in rewards:
+                        rewards[(state, action)] += reward * trans_prob
+                    else:
+                        rewards[(state, action)] = reward * trans_prob
+                    #2# |Set absorption states
+                    absorption[next_state] = done or truncated
+                    #2# |Populate frontier
+                    if (next_state not in visited) and not truncated:
+                        frontier.add((next_state, depth + 1, updated_env))
+                    else:
+                        updated_env.close()
+            else:
+                #2# |Set rewards for unexplored state-action pairs to 0
+                for action in self.actions:
+                    if not (state, action) in rewards:
+                        rewards[(state, action)] = unknown_reward
+        # |Indent the lines below (logging) inside for more detailed updates on MDP status
+        MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
+                    " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
+        logging.info(MDPstatus)
+        env2close.discard(start_env[2]) # Keep the first step active
+        for curr_env in env2close:
+            # |Close all duplicate environments
+            curr_env.close()
+        env2close = set()   # Close ununsed environments at the end of the loop
+        return self.create_MDPTable(start_state=self._current_state, transition=transitions, absorption=absorption, reward=rewards, 
+                                    state_list=visited, action_list=set(self.actions))
     
 
     def get_MDPmatrices(self) -> MDPMatrix:
@@ -266,6 +447,81 @@ class GymDiscreteMDP:
 
 
     @classmethod
+    # @lru_cache(maxsize=10000)
+    def simulateAction(cls, action: int, sim_env, obsrv_features):
+        """
+        Given an instance of a Highway environment and an action to perform in the environment, the function
+        will execute the action without making any changes to the original environment and return the
+        next state and a copy of the updated environment instance.
+
+        This function is implemented as a class methods to prevent multiprocessing from creating multiple copies
+        of the class object for each process.
+
+        This function returns 1 for transition probability since the highwayenv environment is completely
+        deterministic.
+
+        Args:
+            action (int): The action to be taken expressed by an integer number.
+            sim_env (gym environment): Whether to update the state of the current environment or simulate the action
+                             without making changes to the active environment.
+            obsrv_features (list): list of features returned by the gym environment as observation.
+        """
+        # raise NotImplementedError("Please Implement 'simulateAction' method in class "+cls.__name__)
+        if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
+            raise TypeError("Environent parameter is not an instance of GymDiscreteMDP")
+        env_copy = deepcopy(sim_env)
+        obs, reward, done, truncated, info = env_copy.step(action)
+        logging.debug(obs)
+        next_state = cls.to_hashable_state(obs, obsrv_features)
+        return((action, next_state, 1, reward, done, truncated, info, env_copy))
+
+
+    @classmethod
+    def simulateAction_async(cls, sim_env, obsrv_features, results_cache: dict, curr_state, action_seq: list[int], sim_depth: int = 0):
+        """
+        Given an instance of a gym environment and a sequence of actions to perform in the environment, 
+        the function will execute the action sequence without making any changes to the original environment
+        and return all intermediary states and a copy of the updated environment instance.
+
+        This function is implemented as a class methods to prevent multiprocessing from creating multiple copies
+        of the class object for each process.
+
+        Args:
+            action (int): The action to be taken expressed by an integer number.
+            sim_env (gym environment): Whether to update the state of the current environment or simulate the action
+                             without making changes to the active environment.
+            obsrv_features (list): list of features returned by the gym environment as observation.
+            sim_depth: The current depth of the recursive fuction-call stack. First call at 0.
+        """
+        # raise NotImplementedError("Please Implement 'simulateAction_async' method in class "+cls.__name__)
+        # |Return result if already available from cache
+        curr_action = action_seq[sim_depth]
+        if (curr_state, curr_action) in results_cache:
+            curr_action, next_state, _, reward, done, truncated, info, env_copy = results_cache[(curr_state, curr_action)]
+        else:
+            # |Else, simulate action and save current results to cache
+            if sim_depth == 0:
+                # |If first call, check environment type and make a copy of the environment
+                if not results_cache:
+                    raise ValueError("Please provide and empty dictionary for \'results_cache\'")
+                if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
+                    raise TypeError("Environent parameter is not an instance of GymDiscreteMDP")
+                env_copy = deepcopy(sim_env)
+            else:
+                # |Else, carry on with the copy of the first call
+                env_copy = sim_env
+            obs, reward, done, truncated, info = env_copy.step(curr_action)
+            logging.debug(obs)
+            next_state = cls.to_hashable_state(obs, obsrv_features)
+            results_cache[(curr_state, curr_action)] = (curr_action, next_state, 1, reward, done, truncated, info, env_copy)
+        curr_result = [(curr_action, next_state, 1, reward, done, truncated, info, env_copy)]
+        if sim_depth + 1 < len(action_seq):
+            next_state_results = cls.simulateAction_async(next_state, action_seq, env_copy, obsrv_features, results_cache, sim_depth + 1)
+            curr_result.extend(next_state_results)
+        return curr_result
+
+
+    @classmethod
     def mdp_factory(cls, *args, gym_env, **kwargs):
         """
         Return gym environment object based on selection
@@ -284,22 +540,6 @@ class GymDiscreteMDP:
             evironment dependant
         """
         return obs
-
-
-    @classmethod
-    def simulateAction(cls, sim_env, obsrv_features, action):
-        """
-        Given an instance of a gym environment and an action to perform in the environment, the function
-        will execute the action without making any changes to the original environment and return the 
-        next state and a copy of the updated environment instance.
-
-        Args:
-            action (int): The action to be taken expressed by an integer number.
-            sim_env (gym environment): Whether to update the state of the current environment or simulate the action
-                             without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
-        """
-        raise NotImplementedError("Please Implement this method")
 
 
 
@@ -351,91 +591,6 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
 
     def get_env_properties(self):
         return self._first_state, self._current_state, self.actions
-
-
-    def step(self, action):
-        """
-        The function takes an action and returns MDP-compatible state information.
-
-        Args:
-            action (int): The action to be taken expressed by an integer number.
-        """
-        obs, reward, done, truncated, info = self._env.step(action)
-        logging.debug(obs)
-        self._current_state = HighwayDiscreteMDP.to_hashable_state(obs, self.config["observation"]["features"])
-        return self._current_state, reward, done, truncated, info
-   
-
-    def populate_MDPtable(self, max_depth: int = 2, unknown_reward: float = 0):
-        """
-        Code to set up MDP tables
-
-        Parameters:
-            max_depth (int): The number of steps to plan ahead (default = 2)
-            unknown_reward (float): reward value set for state-action pairs which are left
-                                    unexplored due to depth constraint (default = 0)
-        """
-        if (self._mdp_tables and self._mdp_tables.start_state == self._current_state):
-            # |If it was already calculated for the current state return existing table
-            return self._mdp_tables
-        start_env = (self._current_state, 0, self._env)
-        visited = set()
-        transitions = {}
-        rewards = {}
-        absorption = {}
-        frontier = {start_env}
-        env2close = set()   # Maintain list of environments to close
-        while frontier:
-            state, depth, curr_env = frontier.pop()
-            visited.add(state)
-            if len(visited) >= self.max_states:
-                raise ValueError(f"Maximum number of states reached ({self.max_states})")
-            env2close.add(curr_env)
-            if depth < max_depth:
-                # |Parellel execution
-                with Pool(process_count) as pool:
-                    return_vals = pool.map(functools.partial(HighwayDiscreteMDP.simulateAction, 
-                                                             sim_env=curr_env, 
-                                                             obsrv_features=tuple(self.config["observation"]["features"])), self.actions)
-                # |OR Sequential execution (useful for bug-fixing)
-                # return_vals = []
-                # for actn in self.actions:
-                #     return_vals.append(HighwayDiscreteMDP.simulateAction(actn, sim_env=curr_env, obsrv_features=self.config["observation"]["features"]))
-                for action, next_state, trans_prob, reward, done, truncated, info, updated_env in return_vals:
-                    logging.debug(str(state[0]) + ' | ' + str(action) + ' | ' + str(next_state[0]))
-                    #2# |Populate transitions table
-                    if (state, action) not in transitions:
-                        transitions[(state, action)] = {}
-                    if next_state not in transitions[(state, action)]:
-                        transitions[(state, action)][next_state] = trans_prob
-                    #2# |Populate reward functions
-                    if (state[0], action) in rewards:
-                        rewards[(state, action)] += reward * trans_prob
-                    else:
-                        rewards[(state, action)] = reward * trans_prob
-                    #2# |Set absorption states
-                    absorption[next_state] = done or truncated
-                    #2# |Populate frontier
-                    if (next_state not in visited) and not truncated:
-                        frontier.add((next_state, depth + 1, updated_env))
-                    else:
-                        updated_env.close()
-            else:
-                #2# |Set rewards for unexplored state-action pairs to 0
-                for action in self.actions:
-                    if not (state, action) in rewards:
-                        rewards[(state, action)] = unknown_reward
-        # |Indent the lines below (logging) inside for more detailed updates on MDP status
-        MDPstatus = "Current Depth: " + str(depth) + " | Frontier: " + str(len(frontier)) +\
-                    " | Visited: " + str(len(visited)) + " | Transitions:" + str(len(transitions))
-        logging.info(MDPstatus)
-        env2close.discard(start_env[2]) # Keep the first step active
-        for curr_env in env2close:
-            # |Close all duplicate environments
-            curr_env.close()
-        env2close = set()   # Close ununsed environments at the end of the loop
-        return self.create_MDPTable(start_state=self._current_state, transition=transitions, absorption=absorption, reward=rewards, 
-                                    state_list=visited, action_list=set(self.actions))
         
 
     def get_construals_singleobj(self):
@@ -484,33 +639,6 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             veh["heading"] = -1 if(isnan(feature_vals["heading"])) else np.round(feature_vals["heading"], 3)
             road_objects.append(frozendict(veh))
         return tuple(road_objects)
-
-
-    @classmethod
-    @lru_cache(maxsize=10000)
-    def simulateAction(cls, action, sim_env, obsrv_features):
-        """
-        Given an instance of a gym environment and an action to perform in the environment, the function
-         will execute the action without making any changes to the original environment and return the
-         next state and a copy of the updated environment instance.
-
-        This function returns 1 for transition probability since the highwayenv environment is completely
-         deterministic.
-
-        Args:
-            action (int): The action to be taken expressed by an integer number.
-            sim_env (gym environment): Whether to update the state of the current environment or simulate the action
-                             without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
-        """
-        if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
-            raise TypeError("Environent parameter is not an instance of GymDiscreteMDP")
-        # logging.debug(sim_env.env.unwrapped.road.vehicles[0])
-        env_copy = deepcopy(sim_env)
-        obs, reward, done, truncated, info = env_copy.step(action)
-        logging.debug(obs)
-        next_state = HighwayDiscreteMDP.to_hashable_state(obs, obsrv_features)
-        return((action, next_state, 1, reward, done, truncated, info, env_copy))
 
 
     # def set_vehicles(self, vehicles):

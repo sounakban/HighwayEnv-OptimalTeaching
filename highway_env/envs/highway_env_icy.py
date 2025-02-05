@@ -8,6 +8,7 @@ from highway_env.envs.common.action import Action
 from highway_env.road.road import Road, RoadNetwork
 from highway_env.utils import near_split
 from highway_env.vehicle.controller import ControlledVehicle
+from highway_env.vehicle.behavior import IDMVehicle
 from highway_env.vehicle.kinematics import Vehicle
 from highway_env.vehicle.objects import Ice1
 
@@ -69,6 +70,8 @@ class HighwayEnvIcy(AbstractEnv):
     def _create_vehicles(self) -> None:
         """Create some new random vehicles of a given type, and add them on the road."""
         other_vehicles_type = utils.class_from_path(self.config["other_vehicles_type"])
+        if isinstance(other_vehicles_type.create_random(self.road), IDMVehicle):
+            other_vehicles_type.enable_lane_change = self.config.get("enable_lane_change", True)
         other_per_controlled = near_split(
             self.config["vehicles_count"], num_bins=self.config["controlled_vehicles"]
         )
