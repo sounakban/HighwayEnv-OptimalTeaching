@@ -1,6 +1,5 @@
 import gymnasium as gym
 import highway_env
-# from vehicle.kinematics import Vehicl/e
 
 import dataclasses
 from frozendict import frozendict
@@ -8,10 +7,9 @@ import numpy as np
 import scipy as scp
 from math import isnan
 from copy import deepcopy
+import time
 
 from pathos.multiprocessing import ProcessingPool as Pool    # Can run multiprocessing in interactive shell
-# from multiprocessing import Pool
-from concurrent.futures import ThreadPoolExecutor
 import multiprocessing as mp
 process_count = (mp.cpu_count()-2)
 import functools
@@ -367,6 +365,78 @@ class GymDiscreteMDP:
         return self.create_MDPTable(start_state=self._current_state, transition=transitions, absorption=absorption, reward=rewards, 
                                     state_list=visited, action_list=set(self.actions))
     
+   
+    def populate_MDPtable_StaticGridworld(self, coordinate_list: list[State], action_list: list[int] = None, unknown_reward: float = 0, parallel_exec:bool = True, **kwargs):
+        """
+        Code to set up MDP tables which runs multiple environments in parallel for each permutation
+            of action sequence (determined by the depth of execution).
+        This logic is very different from the base-class logic, where the environment starts off in 
+            a certain state and the decision tree is constructed based on actions taken in each 
+            consecutive state. Here, the environment is divided into sections. Vehicles can only 
+            exist in coordinates represented by those sections. This allows much coarser granularity
+            of the environment dicretization and speeds up MDP table generation.
+
+        Parameters:
+            coordinate_list (list[State]): List of discretized grid coordinates, that will be used as initial 
+                                    conditions for simulation
+            action_list (list[int]): List of actions that will be simulated for each coordinate in 
+                                   the coordinate list
+            unknown_reward (float): Reward value set for non-existant state transitions
+            parallel_exec (bool): Whether to run steps in parallel or sequential for-loop
+        """
+        # |Convert to list in case an interator object was passed
+        coordinate_list = list(coordinate_list)
+        if (self._mdp_tables and self._mdp_tables.state_list == coordinate_list):
+            # |If it was already calculated for the current state-list return existing table
+            return self._mdp_tables
+        if not action_list:
+            action_list = self._actions
+        # |Generate all state-action pairs
+        coord_action_pairs = it.product(coordinate_list, action_list)
+        # |Create KDTree of all coordinates to effectively search for closest coordinate
+        search_coordinates = scp.spatial.KDTree(coordinate_list)
+        if parallel_exec:
+            # |Parellel execution
+            print("Simulation start")
+            start = time.time()
+            with Pool(process_count) as pool:
+                return_vals = pool.map(functools.partial(self.simulateAction_StaticGridworld, 
+                                                        sim_env=self._env, obsrv_features=tuple(self.config["observation"]["features"]),
+                                                        **kwargs),
+                                        coord_action_pairs)
+            print("Simulation complete in ",str(time.time()-start)," seconds")
+        else:
+            # |DEBUG: Sequential execution test
+            return_vals = []
+            for st_act in list(coord_action_pairs)[:5]:
+                return_vals.append(self.simulateAction_StaticGridworld(st_act, sim_env=self._env, 
+                                                            obsrv_features=tuple(self.config["observation"]["features"]),
+                                                            **kwargs)
+                                    )
+        # |Populate MDP tables
+        transitions = {}
+        rewards = {}
+        absorption = {}
+        for init_state, action, next_state, trans_prob, reward, done, truncated, info in return_vals:
+            logging.debug(str(init_state) + ' | ' + str(action) + ' | ' + str(next_state))
+            #2# |Populate transitions table
+            if (init_state, action) not in transitions:
+                transitions[(init_state, action)] = {}
+            #3# |Update next state as closest state from coordinates table before updating table
+            closestCoord_dist, colsestCoord_indx = search_coordinates.query(next_state, 1)
+            next_state = coordinate_list[colsestCoord_indx]
+            if next_state not in transitions[(init_state, action)]:
+                transitions[(init_state, action)][next_state] = trans_prob
+            #2# |Populate reward functions
+            if (init_state[0], action) in rewards:
+                rewards[(init_state, action)] += reward * trans_prob
+            else:
+                rewards[(init_state, action)] = reward * trans_prob
+            #2# |Set absorption states
+            absorption[next_state] = done or truncated
+        return self.create_MDPTable(start_state=None, transition=transitions, absorption=absorption, reward=rewards, 
+                                    state_list=coordinate_list, action_list=set(self.actions))
+    
 
     def get_MDPmatrices(self) -> MDPMatrix:
         """
@@ -641,79 +711,10 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             veh["heading"] = np.round(feature_vals.get("heading", -1))
             road_objects.append(frozendict(veh))
         return tuple(road_objects)
-    
-   
-    def populate_MDPtable_StaticGridworld(self, coordinate_list: list[State], action_list: list[int] = None, unknown_reward: float = 0):
-        """
-        Code to set up MDP tables which runs multiple environments in parallel for each permutation
-            of action sequence (determined by the depth of execution).
-        This logic is very different from the base-class logic, where the environment starts off in 
-            a certain state and the decision tree is constructed based on actions taken in each 
-            consecutive state. Here, the environment is divided into sections. Vehicles can only 
-            exist in coordinates represented by those sections. This allows much coarser granularity
-            of the environment dicretization and speeds up MDP table generation.
-
-        Parameters:
-            state_list (list[State]): List of environment states, that will be used as initial 
-                                    conditions for simulation
-            action_list (list[int]): List of actions that will be simulated for each state in 
-                                   the state list
-            unknown_reward (float): Reward value set for non-existant state transitions
-        """
-        # |Convert to list in case an interator object was passed
-        coordinate_list = list(coordinate_list)
-        if (self._mdp_tables and self._mdp_tables.state_list == coordinate_list):
-            # |If it was already calculated for the current state-list return existing table
-            return self._mdp_tables
-        if not action_list:
-            action_list = self._actions
-        # |Generate all state-action pairs
-        coord_action_pairs = it.product(coordinate_list, action_list)
-        # |Create KDTree of all coordinates to effectively search for closest coordinate
-        search_coordinates = scp.spatial.KDTree(coordinate_list)
-        # # |DEBUG: Sequential execution test
-        return_vals = []
-        for st_act in list(coord_action_pairs)[:5]:
-            return_vals.append(self.simulateAction_StaticGridworld(st_act, sim_env=self._env, 
-                                                         obsrv_features=tuple(self.config["observation"]["features"]),
-                                                         veh_speed=highway_env.vehicle.kinematics.Vehicle.MAX_SPEED)
-                                )
-        # return return_vals
-        # |Parellel execution
-        # print("Simulation start")
-        # with Pool(process_count) as pool:
-        #     return_vals = pool.map(functools.partial(self.simulateAction_StaticGridworld, 
-        #                                             sim_env=self._env, obsrv_features=tuple(self.config["observation"]["features"]),
-        #                                             veh_speed=highway_env.vehicle.kinematics.Vehicle.MAX_SPEED),
-        #                             coord_action_pairs)
-        # print("Simulation complete")
-        # |Populate MDP tables
-        transitions = {}
-        rewards = {}
-        absorption = {}
-        for init_state, action, next_state, trans_prob, reward, done, truncated, info in return_vals:
-            logging.debug(str(init_state) + ' | ' + str(action) + ' | ' + str(next_state))
-            #2# |Populate transitions table
-            if (init_state, action) not in transitions:
-                transitions[(init_state, action)] = {}
-            #3# |Update next state as closest state from coordinates table before updating table
-            closestCoord_dist, colsestCoord_indx = search_coordinates.query(next_state, 1)
-            next_state = coordinate_list[colsestCoord_indx]
-            if next_state not in transitions[(init_state, action)]:
-                transitions[(init_state, action)][next_state] = trans_prob
-            #2# |Populate reward functions
-            if (init_state[0], action) in rewards:
-                rewards[(init_state, action)] += reward * trans_prob
-            else:
-                rewards[(init_state, action)] = reward * trans_prob
-            #2# |Set absorption states
-            absorption[next_state] = done or truncated
-        return self.create_MDPTable(start_state=None, transition=transitions, absorption=absorption, reward=rewards, 
-                                    state_list=coordinate_list, action_list=set(self.actions))
 
 
     @classmethod
-    def simulateAction_StaticGridworld(cls, coord_action, sim_env = None, obsrv_features = None, veh_speed:int = 0):
+    def simulateAction_StaticGridworld(cls, coord_action, sim_env = None, obsrv_features = None, **kwargs):
         """
         Given an instance of a gym environment and a sequence of actions to perform in the environment, 
         the function will execute the action sequence without making any changes to the original environment
@@ -728,21 +729,18 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             obsrv_features (list): list of features returned by the gym environment as observation.
             state_action: The initial state and action pair to sumulate
         """
+        veh_speed = kwargs.get("veh_speed", None)
         curr_coord, curr_action = coord_action
         new_env = deepcopy(sim_env)
         v = new_env.unwrapped.road.vehicles[0]
-        print(v.position, v.heading, v.speed)
         v.position = np.array(curr_coord)
         v.heading = 0
-        v.speed = v.MAX_SPEED
+        v.speed = veh_speed or v.MAX_SPEED
         v.target_lane_index = (v.target_lane_index[0], v.target_lane_index[1], int(curr_coord[1]/4))
-        v.target_speed = v.MAX_SPEED
-        print(v.position, v.heading, v.speed, curr_action)
+        v.target_speed = veh_speed or v.MAX_SPEED
         obs, reward, done, truncated, info = new_env.step(curr_action)
-        print(v.position, v.heading, v.speed)
         # print(new_env.unwrapped.road.vehicles)
-        # next_state = cls.to_hashable_state(obs, obsrv_features)
-        print("-------------------")
+        # print("-------------------")
         next_coord = new_env.unwrapped.road.vehicles[0].position
         return (curr_coord, curr_action, next_coord, 1, reward, done, truncated, info)
         
