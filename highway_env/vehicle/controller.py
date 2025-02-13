@@ -256,7 +256,12 @@ class ControlledVehicle(Vehicle):
 class MDPVehicle(ControlledVehicle):
     """A controlled vehicle with a specified discrete range of allowed target speeds."""
 
-    DEFAULT_TARGET_SPEEDS = np.linspace(20, 30, 3)
+    MAX_SPEED = 30.0
+    """ Maximum reachable speed [m/s] """
+    MIN_SPEED = 20.0
+    """ Minimum reachable speed [m/s] """
+    DEFAULT_TARGET_SPEEDS = np.linspace(MIN_SPEED, MAX_SPEED, 3)
+    """ List of allowed speeds [m/s] """
 
     def __init__(
         self,

@@ -61,7 +61,8 @@ class HighwayEnvIcy(AbstractEnv):
         """Create a road composed of straight adjacent lanes."""
         self.road = Road(
             network=RoadNetwork.straight_road_network(
-                self.config["lanes_count"], speed_limit=30
+                self.config["lanes_count"], speed_limit=30,
+                length = self.config["env_len"]
             ),
             np_random=self.np_random,
             record_history=self.config["show_trajectories"],
