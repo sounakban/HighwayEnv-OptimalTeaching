@@ -508,6 +508,24 @@ v_{\text{lat},r} &amp;= -K_{p,\text{lat}} \Delta_{\text{lat}}, \\ \Delta \psi_{r
 </ul>
 </dd>
 </dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="highway_env.vehicle.controller.MDPVehicle.MAX_SPEED">
+<span class="sig-name descname"><span class="pre">MAX_SPEED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">30.0</span></em><a class="headerlink" href="#highway_env.vehicle.controller.MDPVehicle.MAX_SPEED" title="Link to this definition">¶</a></dt>
+<dd><p>Maximum reachable speed [m/s]</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="highway_env.vehicle.controller.MDPVehicle.MIN_SPEED">
+<span class="sig-name descname"><span class="pre">MIN_SPEED</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20.0</span></em><a class="headerlink" href="#highway_env.vehicle.controller.MDPVehicle.MIN_SPEED" title="Link to this definition">¶</a></dt>
+<dd><p>Minimum reachable speed [m/s]</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="highway_env.vehicle.controller.MDPVehicle.DEFAULT_TARGET_SPEEDS">
+<span class="sig-name descname"><span class="pre">DEFAULT_TARGET_SPEEDS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">array([20.,</span> <span class="pre">25.,</span> <span class="pre">30.])</span></em><a class="headerlink" href="#highway_env.vehicle.controller.MDPVehicle.DEFAULT_TARGET_SPEEDS" title="Link to this definition">¶</a></dt>
+<dd><p>List of allowed speeds [m/s]</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="highway_env.vehicle.controller.MDPVehicle.act">
 <span class="sig-name descname"><span class="pre">act</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">action</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../../_modules/highway_env/vehicle/controller/#MDPVehicle.act"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#highway_env.vehicle.controller.MDPVehicle.act" title="Link to this definition">¶</a></dt>
@@ -675,6 +693,9 @@ v_{\text{lat},r} &amp;= -K_{p,\text{lat}} \Delta_{\text{lat}}, \\ \Delta \psi_{r
 </ul>
 </li>
 <li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle"><code class="docutils literal notranslate"><span class="pre">MDPVehicle</span></code></a><ul>
+<li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle.MAX_SPEED"><code class="docutils literal notranslate"><span class="pre">MDPVehicle.MAX_SPEED</span></code></a></li>
+<li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle.MIN_SPEED"><code class="docutils literal notranslate"><span class="pre">MDPVehicle.MIN_SPEED</span></code></a></li>
+<li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle.DEFAULT_TARGET_SPEEDS"><code class="docutils literal notranslate"><span class="pre">MDPVehicle.DEFAULT_TARGET_SPEEDS</span></code></a></li>
 <li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle.act"><code class="docutils literal notranslate"><span class="pre">MDPVehicle.act()</span></code></a></li>
 <li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle.index_to_speed"><code class="docutils literal notranslate"><span class="pre">MDPVehicle.index_to_speed()</span></code></a></li>
 <li><a class="reference internal" href="#highway_env.vehicle.controller.MDPVehicle.speed_to_index"><code class="docutils literal notranslate"><span class="pre">MDPVehicle.speed_to_index()</span></code></a></li>
