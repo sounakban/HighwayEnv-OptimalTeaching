@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
-from highway_env.envs.discreteMDP_wrapper import HighwayDiscreteMDP, OptimalPolicy
+from highway_env.envs.MDPwrapper_Gym import HighwayDiscreteMDP, OptimalPolicy
 
 import logging
 logger = logging.getLogger()
