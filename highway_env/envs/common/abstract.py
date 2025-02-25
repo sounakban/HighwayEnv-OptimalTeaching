@@ -180,7 +180,7 @@ class AbstractEnv(gym.Env):
             "action": action
         }
         try:
-            info["rewards"] = self._rewards(action)
+            info["rewards"] = self._reward(action)     # This was changed from _rewards to _reward
         except NotImplementedError:
             pass
         return info

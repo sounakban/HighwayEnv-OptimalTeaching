@@ -10,7 +10,7 @@ from highway_env.utils import near_split
 from highway_env.vehicle.controller import ControlledVehicle
 from highway_env.vehicle.behavior import IDMVehicle
 from highway_env.vehicle.kinematics import Vehicle
-from highway_env.vehicle.objects import Ice1
+from highway_env.vehicle.objects import Ice1, Obstacle
 
 
 Observation = np.ndarray
@@ -102,8 +102,9 @@ class HighwayEnvIcy(AbstractEnv):
         # print([veh.position for veh in self.road.vehicles])
 
         # Add ice
+        num_icePatches = self.config.get("ice_count", len(ice_locations_subset))
         length, width = 15, 5
-        for pos in ice_locations_subset:
+        for pos in ice_locations_subset[:num_icePatches]:
             ice = Ice1(self.road, pos)
             ice.LENGTH, ice.WIDTH = (length, width)
             ice.diagonal = np.sqrt(ice.LENGTH**2 + ice.WIDTH**2)
@@ -117,6 +118,24 @@ class HighwayEnvIcy(AbstractEnv):
         #     ice.LENGTH, ice.WIDTH = (length, width)
         #     ice.diagonal = np.sqrt(ice.LENGTH**2 + ice.WIDTH**2)
         #     self.road.objects.append(ice)
+
+        # Add Obstacles
+        num_obstacles = self.config.get("obstacle_count", len(obstacle_locations))
+        length, width = 15, 5
+        for pos in obstacle_locations[:num_obstacles]:
+            obstacle = Obstacle(self.road, pos)
+            obstacle.LENGTH, obstacle.WIDTH = (length, width)
+            obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
+            self.road.objects.append(obstacle)
+        # TODO: Add logic for randomizing obstacle locations
+        # length, width = 15, 5
+        # for _ in range(self.config["obstacle_count"]):
+        #     obstacle = obstacle.create_random(
+        #             self.road, spacing=1 / self.config["vehicles_density"]
+        #         )
+        #     obstacle.LENGTH, obstacle.WIDTH = (length, width)
+        #     obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
+        #     self.road.objects.append(obstacle)
 
 
 
@@ -237,7 +256,11 @@ class HighwayEnvIcyCustom(HighwayEnvIcy):
 
 
 
-# Predefined ice locations to start off
+# Predefined object locations to start off
+# from random import sample
+# from itertools import product
+# sample(list(product(range(3000), (0,4,8))), k=50)
+
 ice_locations = [[151.090512, 4], [172.45562252, 8], [195.84555251, 4], [218.85401083, 4], [244.21423732, 8], [268.52539651, 0], [294.43759937, 8], \
                  [317.3234107, 0], [343.98100414, 8], [368.8641181, 0], [392.53761495, 4], [415.93365471, 4], [437.50992641, 0], [460.59978171, 8], \
                  [482.42279356, 0], [505.44612845, 0], [527.55962487, 0], [551.07811977, 0], [575.47471293, 4], [598.6810601, 4], [620.76286179, 8], \
@@ -250,6 +273,11 @@ ice_locations = [[151.090512, 4], [172.45562252, 8], [195.84555251, 4], [218.854
                  [153.59833047, 8], [179.04649029, 4], [201.46458985, 8], [224.88475098, 4], [248.43447295, 4], [273.87161948, 4], [296.21920674, 4], \
                  [319.25837177, 8], [343.72797618, 8], [368.714841, 4], [393.41812949, 0], [414.77486297, 0], [441.81648307, 0], [464.07467143, 4], \
                  [485.39355587, 0], [510.81805766, 4], [536.10782126, 8], [561.21038789, 0], [584.16580601, 0], [608.02916678, 4], [633.43185766, 4]]
-
 ice_locations_subset = [[151.090512, 4], [218.85401083, 8], [268.52539651, 0], [294.43759937, 0], [343.98100414, 4], [392.53761495, 8], [460.59978171, 4], \
                         [505.44612845, 0], [551.07811977, 8], [633.43185766, 0]]
+
+obstacle_locations = [(932, 4), (870, 4), (560, 8), (1861, 4), (2753, 0), (572, 4), (2860, 8), (32, 0), (394, 4), (2439, 0), (2058, 0), (910, 0), \
+                      (1884, 4), (527, 4), (2524, 4), (2967, 0), (1972, 4), (622, 4), (679, 4), (524, 0), (2210, 0), (820, 0), (2365, 8), (863, 8), \
+                      (2989, 0), (155, 0), (1702, 8), (1291, 8), (1032, 4), (1300, 8), (2468, 0), (227, 4), (2915, 8), (2532, 8), (597, 0), (2760, 4), \
+                      (2041, 4), (351, 0), (92, 4), (2004, 0), (83, 4), (1771, 0), (2329, 4), (832, 8), (55, 8), (2384, 8), (298, 4), (2746, 8), (1058, 0), \
+                      (452, 8)]

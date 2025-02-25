@@ -44,8 +44,8 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
                   and specify (at least) the following features in config:\n \
                   \tpresence, x, y, vx, vy, heading.")
         super().__init__(*args, **kwargs)
-        self._first_state = self.to_hashable_state(self._first_state, self.config["observation"]["features"])
-        self._current_state = self.to_hashable_state(self._current_state, self.config["observation"]["features"])
+        self._first_state = self.obs_to_hashable(self._first_state, self.config["observation"]["features"])
+        self._current_state = self.obs_to_hashable(self._current_state, self.config["observation"]["features"])
         # self.action_dict = self._env.unwrapped.action_type.actions_indexes
         # |Set perception distance to maximum. So, state of all cars in the environment 
         # |are available irrespective of whether they are in the visibility window.
@@ -68,6 +68,10 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             "see_behind": True  # Report vehicles behind the ego vehicle
             }
         }
+    
+
+    def get_obsFeatures(self, ):
+        return self.config["observation"]["features"]
         
 
     def get_construals_singleobj(self):
@@ -105,7 +109,20 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
 
 
     @classmethod
-    def to_hashable_state(cls, obs, obs_config):
+    def obs_to_hashable(cls, obs, **kwargs):
+        """
+        Given an observation (obtained from a step function), extract relevant features and store in 
+            a hashable (discretized) variable.
+
+        Args:
+            obs (Gym Observation space): The environment where the agent state needs to be set.
+
+        Kwrgs:
+            obs_config (list): The list of features in the observation values returned by the step function
+        """
+        obs_config = kwargs.get("obs_config", None)
+        if not obs_config:
+            raise ValueError("Please provide obs_config as argument")
         road_objects = []
         for road_obj in obs:
             feature_vals = {k: v for k,v in zip(obs_config, road_obj)}
@@ -124,6 +141,21 @@ class HighwayDiscreteMDP(GymDiscreteMDP):
             v.position = np.array(new_v['position'])
             v.heading = new_v['heading']
             v.speed = new_v['speed']
+       
+
+    def step(self, action):
+        """
+        The function takes an action and returns MDP-compatible state information.
+
+        Args:
+            action (int): The action to be taken expressed by an integer number.
+        """
+        obs, reward, done, truncated, info = self._env.step(action)
+        logging.debug(obs)
+        # |Here, the classmethod 'obs_to_hashable' is being called with self instead of the class name to allow the code 
+        # | to call the overridden 'obs_to_hashable' method implemented in any child class.
+        self._current_state = self.obs_to_hashable(obs, obs_config = self.config["observation"]["features"])
+        return self._current_state, reward, done, truncated, info
         
     @classmethod
     def setState_egoVeh(self, v, new_coord, veh_speed):
@@ -154,8 +186,8 @@ class HighwayGridworldMDP(GymGridworldMDP):
                   and specify (at least) the following features in config:\n \
                   \tpresence, x, y, vx, vy, heading.")
         super().__init__(*args, **kwargs)
-        self._first_state = self.to_hashable_state(self._first_state, self.config["observation"]["features"])
-        self._current_state = self.to_hashable_state(self._current_state, self.config["observation"]["features"])
+        self._first_state = self.obs_to_hashable(self._first_state, obs_config = self.config["observation"]["features"])
+        self._current_state = self.obs_to_hashable(self._current_state, obs_config = self.config["observation"]["features"])
         # self.action_dict = self._env.unwrapped.action_type.actions_indexes
         # |Set perception distance to maximum. So, state of all cars in the environment 
         # |are available irrespective of whether they are in the visibility window.
@@ -178,12 +210,17 @@ class HighwayGridworldMDP(GymGridworldMDP):
             "see_behind": True  # Report vehicles behind the ego vehicle
             }
         }
+    
+    
+    def get_obsFeatures(self, ):
+        return self.config["observation"]["features"]
         
 
     def get_construals_singleobj(self):
         '''
         Returns a list of environments each containing the ego vehicle along with a single object or vehicle.
-        Te first environment in the list '''
+        Te first environment in the list 
+        '''
         veh_list = self._env.unwrapped.road.vehicles[:]         # Only contains list of vehicles
         ego_veh = veh_list[0]
         veh_list = set(veh_list[1:])                            # Update list to only contain ado vehicles
@@ -212,48 +249,6 @@ class HighwayGridworldMDP(GymGridworldMDP):
             # env_copy.unwrapped.road.vehicles.remove(veh)
             contrued_envs.append(curr_construal)
         return contrued_envs
-
-
-    @classmethod
-    def to_hashable_state(cls, obs, obs_config):
-        road_objects = []
-        for road_obj in obs:
-            feature_vals = {k: v for k,v in zip(obs_config, road_obj)}
-            veh = {}
-            veh["position"] = tuple(np.round((feature_vals["x"],feature_vals["y"]), 2))
-            veh["speed"] = tuple(np.round((feature_vals["vx"],feature_vals["vy"]), 2))
-            # Replace NaN values of headings with -1, allows comparison of states.
-            veh["heading"] = np.round(feature_vals.get("heading", -1))
-            road_objects.append(frozendict(veh))
-        return tuple(road_objects)
-
-
-    @classmethod
-    def simulateAction(cls, coord_action, sim_env = None, obsrv_features = None, **kwargs):
-        """
-        Given an instance of a gym environment and a sequence of actions to perform in the environment, 
-        the function will execute the action sequence without making any changes to the original environment
-        and return all intermediary states and a copy of the updated environment instance.
-
-        This function is implemented as a class methods to prevent multiprocessing from creating multiple copies
-        of the class object for each process.
-
-        Args:
-            sim_env (gym environment): Whether to update the state of the current environment or simulate the action
-                             without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
-            state_action: The initial state and action pair to sumulate
-        """
-        curr_coord, curr_action = coord_action
-        new_env = deepcopy(sim_env)
-        v = new_env.unwrapped.road.vehicles[0]
-        veh_speed = kwargs.get("veh_speed", v.MAX_SPEED)
-        cls.setState_egoVeh(v, curr_coord, veh_speed)
-        obs, reward, done, truncated, info = new_env.step(curr_action)
-        # print(new_env.unwrapped.road.vehicles)
-        # print("-------------------")
-        next_coord = new_env.unwrapped.road.vehicles[0].position
-        return (curr_coord, curr_action, next_coord, 1, reward, done, truncated, info)
         
 
     def setState_allVeh(self, vehicles):
@@ -262,14 +257,91 @@ class HighwayGridworldMDP(GymGridworldMDP):
             v.position = np.array(new_v['position'])
             v.heading = new_v['heading']
             v.speed = new_v['speed']
-        
+       
+
+    def step(self, action):
+        """
+        The function takes an action and returns MDP-compatible state information.
+
+        Args:
+            action (int): The action to be taken expressed by an integer number.
+        """
+        obs, reward, done, truncated, info = self._env.step(action)
+        logging.debug(obs)
+        # |Here, the classmethod 'obs_to_hashable' is being called with self instead of the class name to allow the code 
+        # | to call the overridden 'obs_to_hashable' method implemented in any child class.
+        self._current_state = self.obs_to_hashable(obs, obs_config = self.config["observation"]["features"])
+        return self._current_state, reward, done, truncated, info
+
 
     @classmethod
-    def setState_egoVeh(self, v, new_coord, veh_speed):
-        v.position = np.array(new_coord)
+    def obs_to_hashable(cls, obs, **kwargs):
+        """
+        Given an observation (obtained from a step function), extract relevant features and store in 
+            a hashable (discretized) variable.
+
+        Args:
+            obs (Gym Observation space): The observation space from which the agent state needs to be extracted.
+
+        Kwrgs:
+            obs_config (list): The list of features in the observation values returned by the step function
+        """
+        obs_config = kwargs.get("obs_config", None)
+        if not obs_config:
+            raise ValueError("Please provide value for obs_config argument")
+        road_objects = []
+        for road_obj in obs:
+            feature_vals = {k: v for k,v in zip(obs_config, road_obj)}
+            veh = {}
+            veh["position"] = (feature_vals["x"],feature_vals["y"])
+            veh["speed"] = (feature_vals["vx"],feature_vals["vy"])
+            # Replace NaN values of headings with -1, allows comparison of states.
+            veh["heading"] = feature_vals.get("heading", -1)
+            road_objects.append(frozendict(veh))
+        return road_objects[0]["position"]
+        return tuple(road_objects)
+
+
+    @classmethod
+    def get_agentState(cls, env, **kwargs):
+        """
+        Given an observation (obtained from a step function), extract relevant features and store in 
+            a hashable (discretized) variable.
+
+        Args:
+            env (Gym Environment): The environment from which the agent state needs to be extracted.
+        """
+        return env.unwrapped.road.vehicles[0]["position"]
+            
+
+    @classmethod
+    def set_agentState(cls, env, **kwargs):
+        """
+        GIven an an environment and agent properties, set the state of the agent.
+
+        Args:
+            env (Gym Environment): The environment where the agent state needs to be set.
+
+        Kwrgs:
+            coord (2D-tuple): The coordinate to set for the ego vehicle
+            speed (int): The speed to set for the ego vehicle
+        """
+        v = env.unwrapped.road.vehicles[0]
+        new_coord = kwargs.get("coord", None)
+        if not new_coord:
+            raise ValueError("Starting coordinate for vehicle not provided")
+        new_speed = kwargs.get("speed", None)
+        if not new_speed:
+            new_speed = v.target_speed
+            logging.info("Maintaining current vehicle speed. For custom speed, provide \'speed\' argument.")
+        new_coord = np.array(new_coord).astype(float)
+        v.position = new_coord
         v.heading = 0
-        v.speed = veh_speed
+        v.speed = new_speed
         v.target_lane_index = (v.target_lane_index[0], v.target_lane_index[1], int(new_coord[1]/4))
-        v.target_speed = veh_speed
+        v.target_speed = new_speed
+        # print(new_env.unwrapped.road.vehicles)
+        # print("-------------------")
+        return env
 
 

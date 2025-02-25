@@ -262,6 +262,8 @@ class MDPVehicle(ControlledVehicle):
     """ Maximum reachable speed [m/s] """
     DEFAULT_TARGET_SPEEDS = np.linspace(MIN_SPEED, MAX_SPEED, 3)
     """ List of allowed speeds [m/s] """
+    # |Min and Max speeds are set to 18 and 32 because the histerisis from the speed change
+    #  ensures an average speed of 20 and 30 when simulating at 5Hz.
 
     def __init__(
         self,
