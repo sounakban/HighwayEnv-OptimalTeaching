@@ -495,7 +495,7 @@
             <span class="s2">&quot;action&quot;</span><span class="p">:</span> <span class="n">action</span>
         <span class="p">}</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="n">info</span><span class="p">[</span><span class="s2">&quot;rewards&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rewards</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+            <span class="n">info</span><span class="p">[</span><span class="s2">&quot;rewards&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reward</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>     <span class="c1"># This was changed from _rewards to _reward</span>
         <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
             <span class="k">pass</span>
         <span class="k">return</span> <span class="n">info</span></div>

@@ -587,6 +587,8 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot; Maximum reachable speed [m/s] &quot;&quot;&quot;</span>
     <span class="n">DEFAULT_TARGET_SPEEDS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">MIN_SPEED</span><span class="p">,</span> <span class="n">MAX_SPEED</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot; List of allowed speeds [m/s] &quot;&quot;&quot;</span>
+    <span class="c1"># |Min and Max speeds are set to 18 and 32 because the histerisis from the speed change</span>
+    <span class="c1">#  ensures an average speed of 20 and 30 when simulating at 5Hz.</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
