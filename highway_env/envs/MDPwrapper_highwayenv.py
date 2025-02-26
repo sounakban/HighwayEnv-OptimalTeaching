@@ -6,7 +6,6 @@ import numpy as np
 import scipy as scp
 from math import isnan
 from copy import deepcopy
-import time
 
 from pathos.multiprocessing import ProcessingPool as Pool    # Can run multiprocessing in interactive shell
 import multiprocessing as mp
@@ -298,9 +297,22 @@ class HighwayGridworldMDP(GymGridworldMDP):
             # Replace NaN values of headings with -1, allows comparison of states.
             veh["heading"] = feature_vals.get("heading", -1)
             road_objects.append(frozendict(veh))
-        return road_objects[0]["position"]
+        return road_objects[0]["position"] + (road_objects[0]["speed"][0],)
         return tuple(road_objects)
+    
 
+    def coordinate_to_state(self, coord_list):
+        """
+        Takes a list of starting coordinates as inputs and returns a list of all possible states based on 
+        all possible combinations of environment features.
+        """
+        ego_vehicle = self._env.unwrapped.road.vehicles[0]
+        if ego_vehicle.__class__.__name__ == "MDPVehicle":
+            permissible_speeds = ego_vehicle.DEFAULT_TARGET_SPEEDS
+        else:
+            raise ValueError("The current implementation only works with MDP ego vehicles")
+        updated_state_list = [coord+(spd,) for coord, spd in it.product(coord_list,permissible_speeds)]
+        return updated_state_list
 
     @classmethod
     def get_agentState(cls, env, **kwargs):
@@ -315,25 +327,26 @@ class HighwayGridworldMDP(GymGridworldMDP):
             
 
     @classmethod
-    def set_agentState(cls, env, **kwargs):
+    def set_agentState(cls, env, target_state, **kwargs):
         """
         GIven an an environment and agent properties, set the state of the agent.
 
         Args:
             env (Gym Environment): The environment where the agent state needs to be set.
+            target_state: the state to which the agent has to be set.
 
         Kwrgs:
-            coord (2D-tuple): The coordinate to set for the ego vehicle
             speed (int): The speed to set for the ego vehicle
         """
-        v = env.unwrapped.road.vehicles[0]
-        new_coord = kwargs.get("coord", None)
-        if not new_coord:
+        if not target_state:
             raise ValueError("Starting coordinate for vehicle not provided")
-        new_speed = kwargs.get("speed", None)
-        if not new_speed:
-            new_speed = v.target_speed
-            logging.info("Maintaining current vehicle speed. For custom speed, provide \'speed\' argument.")
+        v = env.unwrapped.road.vehicles[0]
+        new_coord = target_state[:2]
+        new_speed = target_state[2]
+        # new_speed = kwargs.get("speed", None)
+        # if not new_speed:
+        #     new_speed = v.target_speed
+        #     logging.info("Maintaining current vehicle speed. For custom speed, provide \'speed\' argument.")
         new_coord = np.array(new_coord).astype(float)
         v.position = new_coord
         v.heading = 0

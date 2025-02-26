@@ -66,6 +66,7 @@ class PlanningResult():
     state_values: dict[Tuple[frozendict], float]
     action_values: dict[Tuple[frozendict], dict[int, float]]
     mdp_type: str
+    iterations: int
     sourceMatrix_uid: str  # Store the unique identifier for the MDPMatrix object the plan 
                             #  was generated from to check if a plan already exists 
 
@@ -241,7 +242,7 @@ class GymMDP:
                                     based on delta between consecutive iterations (default = 1e-6)
         """
         mat = self.get_MDPmatrices()
-        if (self._mdp_plan and self._mdp_plan.sourceMatrix_uid == id(mat)):
+        if (self._mdp_plan and self._mdp_plan.sourceMatrix_uid == id(mat) and self._mdp_plan.iterations == iterations):
             # If it was already calculated for the current state return existing plan
             return self._mdp_plan
         if np.all(mat.absorbing_state_mask == False) and mat.discount == 1:
@@ -260,16 +261,20 @@ class GymMDP:
         #         break
         #     value[:] = value_
         # |torch implementation
-        reward_tensor = torch.tensor(mat.reward).to(device)
-        discount_tensor = torch.tensor(mat.discount).to(device)
-        transition_tensor = torch.tensor(mat.transition).to(device)
-        # reward_tensor = torch.tensor(mat.reward)
-        # discount_tensor = torch.tensor(mat.discount)
-        # transition_tensor = torch.tensor(mat.transition)
+        reward_tensor = torch.tensor(mat.reward)
+        discount_tensor = torch.tensor(mat.discount)
+        transition_tensor = torch.tensor(mat.transition)
+        if torch.cuda.is_available():
+            # |Move calculations to GPU if available
+            reward_tensor = reward_tensor.to(device)
+            discount_tensor = discount_tensor.to(device)
+            transition_tensor = transition_tensor.to(device)
         for i in range(iterations):
             # print(np.argwhere(np.isnan(value)))
-            qvalues[:] = (reward_tensor + discount_tensor*torch.einsum("san,n->sa", transition_tensor, torch.tensor(value).to(device))).to('cpu').numpy()
-            # qvalues[:] = (reward_tensor + discount_tensor*torch.einsum("san,n->sa", transition_tensor, torch.tensor(value))).numpy()
+            if torch.cuda.is_available():
+                qvalues[:] = (reward_tensor + discount_tensor*torch.einsum("san,n->sa", transition_tensor, torch.tensor(value).to(device))).to('cpu').numpy()
+            else:
+                qvalues[:] = (reward_tensor + discount_tensor*torch.einsum("san,n->sa", transition_tensor, torch.tensor(value))).numpy()
             qvalues[mat.absorbing_state_mask, :] = 0
             value_[:] = qvalues.max(axis=1)
             max_residual = np.abs(value - value_).max()
@@ -278,7 +283,7 @@ class GymMDP:
             value[:] = value_
         # |Set variables
         # assert max_residual < value_epsilon, "Value iteration did not converge"
-        if max_residual > value_epsilon: print("Value iteration did not converge")
+        if max_residual > value_epsilon: warnings.warn("Value iteration did not converge")
         action_values = {}
         for s, q in zip(mat.state_list, qvalues):
             action_values[s] = dict(zip(mat.action_list, q))
@@ -289,6 +294,7 @@ class GymMDP:
             state_values=dict(zip(mat.state_list, value.tolist())),
             action_values=action_values,
             mdp_type=self.MDP_TYPE,
+            iterations=iterations,
             sourceMatrix_uid=id(mat)
         )
         return self._mdp_plan
@@ -296,7 +302,7 @@ class GymMDP:
 
     @classmethod
     # @lru_cache(maxsize=10000)
-    def simulateAction(cls, action: int, sim_env: gymOrderEnforcing = None, obsrv_features = None, **kwargs):
+    def simulateAction(cls, action: int, sim_env: gymOrderEnforcing = None, **kwargs):
         """
         Given an instance of a Highway environment and an action to perform in the environment, the function
         will execute the action without making any changes to the original environment and return the
@@ -312,7 +318,6 @@ class GymMDP:
             action (int): The action to be taken expressed by an integer number.
             sim_env (gym environment): Whether to update the state of the current environment or simulate the action
                              without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
         """
         raise NotImplementedError("Please Implement 'simulateAction' method in class "+cls.__name__)
 
@@ -486,7 +491,6 @@ class GymDiscreteMDP(GymMDP):
             action (int): The action to be taken expressed by an integer number.
             sim_env (gym environment): Whether to update the state of the current environment or simulate the action
                              without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
         """
         if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
             raise TypeError("Environent parameter is not an instance of GymDiscreteMDP")
@@ -498,7 +502,7 @@ class GymDiscreteMDP(GymMDP):
     
 
     @classmethod
-    def simulateAction_async(cls, sim_env: gymOrderEnforcing, obsrv_features, results_cache: dict, curr_state, action_seq: list[int], sim_depth: int = 0, **kwargs):
+    def simulateAction_async(cls, sim_env: gymOrderEnforcing, results_cache: dict, curr_state, action_seq: list[int], sim_depth: int = 0, **kwargs):
         """
         Given an instance of a gym environment and a sequence of actions to perform in the environment, 
         the function will execute the action sequence without making any changes to the original environment
@@ -511,7 +515,6 @@ class GymDiscreteMDP(GymMDP):
             action (int): The action to be taken expressed by an integer number.
             sim_env (gym environment): Whether to update the state of the current environment or simulate the action
                              without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
             sim_depth: The current depth of the recursive fuction-call stack. First call at 0.
         """
         # raise NotImplementedError("Please Implement 'simulateAction_async' method in class "+cls.__name__)
@@ -537,7 +540,7 @@ class GymDiscreteMDP(GymMDP):
             results_cache[(curr_state, curr_action)] = (curr_action, next_state, 1, reward, done, truncated, info, env_copy)
         curr_result = [(curr_action, next_state, 1, reward, done, truncated, info, env_copy)]
         if sim_depth + 1 < len(action_seq):
-            next_state_results = cls.simulateAction_async(next_state, action_seq, env_copy, obsrv_features, results_cache, sim_depth + 1)
+            next_state_results = cls.simulateAction_async(next_state, action_seq, env_copy, results_cache, sim_depth + 1)
             curr_result.extend(next_state_results)
         return curr_result
     
@@ -583,7 +586,7 @@ class GymGridworldMDP(GymMDP):
         return self._current_state, reward, done, truncated, info
         
    
-    def populate_MDPtable(self, coordinate_list: list[State], action_list: list[int] = None,
+    def populate_MDPtable(self, coordinate_list: list[tuple], action_list: list[int] = None,
                           unknown_reward: float = 0, parallel_exec:bool = True, **kwargs):
         """
         Code to set up MDP tables which runs multiple environments in parallel for each permutation
@@ -604,34 +607,35 @@ class GymGridworldMDP(GymMDP):
         """
         # |Convert to list in case an interator object was passed
         coordinate_list = list(coordinate_list)
-        if (self._mdp_tables and self._mdp_tables.validation_check == (self._env, coordinate_list)):
+        # |Convert coordinate list to state list by adding environment-specific features
+        state_list = self.coordinate_to_state(coordinate_list)
+        if (self._mdp_tables and self._mdp_tables.validation_check == (self._env, state_list)):
             # |If it was already calculated for the current state-list return existing table
             return self._mdp_tables
         if not action_list:
             action_list = self._actions
         # |Generate all state-action pairs
-        coord_action_pairs = it.product(coordinate_list, action_list)
+        state_action_pairs = it.product(state_list, action_list)
         if parallel_exec:
             # |Parellel execution
             print("Simulation start")
             start = time.time()
             with Pool(process_count) as pool:
-                return_vals = pool.map(functools.partial(self.simulateAction_wCoord, 
-                                                        sim_env=self._env, obsrv_features=tuple(self.config["observation"]["features"]),
+                return_vals = pool.map(functools.partial(self.simulateAction_wState, sim_env=self._env,
                                                         obs_config=tuple(self.config["observation"]["features"]),
                                                         **kwargs),
-                                        coord_action_pairs)
+                                        state_action_pairs)
             print("Simulation complete in ",str(time.time()-start)," seconds")
         else:
             # |DEBUG: Sequential execution test
             return_vals = []
-            for st_act in list(coord_action_pairs):
-                return_vals.append(self.simulateAction_wCoord(st_act, sim_env=self._env,
+            for st_act in list(state_action_pairs):
+                return_vals.append(self.simulateAction_wState(st_act, sim_env=self._env,
                                                             obs_config=tuple(self.config["observation"]["features"]),
                                                             **kwargs)
                                     )
         # |Create KDTree of all coordinates to effectively search for closest coordinate
-        self._search_coordinates = scp.spatial.KDTree(coordinate_list)
+        self._search_coordinates = scp.spatial.KDTree(state_list)
         # |Populate MDP tables
         transitions = {}
         rewards = {}
@@ -642,8 +646,8 @@ class GymGridworldMDP(GymMDP):
             if (init_state, action) not in transitions:
                 transitions[(init_state, action)] = {}
             #3# |Update next state as closest state from coordinates table before updating table
-            closestCoord_dist, colsestCoord_indx = self._search_coordinates.query(next_state, 1)
-            next_state = coordinate_list[colsestCoord_indx]
+            closestCoord_dist, closestCoord_indx = self._search_coordinates.query(next_state, 1)
+            next_state = state_list[closestCoord_indx]
             if next_state not in transitions[(init_state, action)]:
                 transitions[(init_state, action)][next_state] = trans_prob
             #2# |Populate reward functions
@@ -662,8 +666,8 @@ class GymGridworldMDP(GymMDP):
         # |Reset MDP matices and plan, since new table was calculated
         self._mdp_matrices = self._mdp_plan = None
         self._mdp_tables = MDPTable(start_state=None, transition=transitions, absorption=absorption, 
-                            reward=rewards, state_list=coordinate_list, action_list=action_list, 
-                            validation_check=(self._env, coordinate_list), mdp_type=self.MDP_TYPE)
+                            reward=rewards, state_list=state_list, action_list=action_list, 
+                            validation_check=(self._env, state_list), mdp_type=self.MDP_TYPE)
         return self._mdp_tables
     
 
@@ -685,7 +689,6 @@ class GymGridworldMDP(GymMDP):
             action (int): The action to be taken expressed by an integer number.
             sim_env (gym environment): Whether to update the state of the current environment or simulate the action
                              without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
 
         Kwargs:
             search_coordinates (scipy KDTree): A KDTree object initialized with all grid coordinates.
@@ -699,7 +702,7 @@ class GymGridworldMDP(GymMDP):
         # |Update agent coordinate to nearest grid coordinate
         curr_coord = cls.get_agentState(env_copy)
         grid_coord = search_coordinates.query(curr_coord, 1)
-        env_copy = cls.set_agentState(env_copy, coord=grid_coord, **kwargs)
+        env_copy = cls.set_agentState(env_copy, target_state=grid_coord, **kwargs)
         # |Perform action
         obs, reward, done, truncated, info = env_copy.step(action)
         logging.debug(obs)
@@ -708,7 +711,7 @@ class GymGridworldMDP(GymMDP):
 
 
     @classmethod
-    def simulateAction_wCoord(cls, coord_action: tuple, sim_env: gymOrderEnforcing, **kwargs):
+    def simulateAction_wState(cls, state_action: tuple, sim_env: gymOrderEnforcing, **kwargs):
         """
         Given an instance of a gym environment and a sequence of actions to perform in the environment, 
         the function will execute the action sequence without making any changes to the original environment
@@ -718,23 +721,22 @@ class GymGridworldMDP(GymMDP):
         of the class object for each process.
 
         Args:
-            coord_action: The initial coordinate and action pair to sumulate
+            state_action: The initial-state and action pair to sumulate
             sim_env (gym environment): Whether to update the state of the current environment or simulate the action
                              without making changes to the active environment.
-            obsrv_features (list): list of features returned by the gym environment as observation.
         """
         if not isinstance(sim_env, gym.wrappers.common.OrderEnforcing):
             raise TypeError("Environent argument is not an instance of GymDiscreteMDP")
-        curr_coord, curr_action = coord_action
+        curr_state, curr_action = state_action
         env_copy = deepcopy(sim_env)
-        env_copy = cls.set_agentState(env_copy, coord=curr_coord, **kwargs)
+        env_copy = cls.set_agentState(env_copy, target_state=curr_state, **kwargs)
         # |Perform action
         obs, reward, done, truncated, info = env_copy.step(curr_action)
         next_coord = cls.obs_to_hashable(obs, **kwargs)
-        return (curr_coord, curr_action, next_coord, 1, reward, done, truncated, info)
+        return (curr_state, curr_action, next_coord, 1, reward, done, truncated, info)
 
 
-    def simulatePlan(self, init_coord, policy, **kwargs):
+    def simulatePlan(self, init_state, policy, **kwargs):
         """
         Given an starting coordinate, the function will execute a series of actions based on the 
             calculated optimal policy for a gridworld representation if the gym environment.
@@ -745,30 +747,37 @@ class GymGridworldMDP(GymMDP):
         Kwrgs:
             speed (int): The speed to set for the ego vehicle
         """
-        sim_env = self.set_agentState(deepcopy(self._env), coord = init_coord, **kwargs)
-        next_coord = init_coord
+        sim_env = self.set_agentState(deepcopy(self._env), target_state=init_state, **kwargs)
+        curr_state = init_state
         done = False
         max_steps = 1e4
         agent_traj = []
         while not done and max_steps > 0:
-            actions = policy(next_coord)
-            # print(policy.action_values(next_coord))
+            actions = policy(curr_state)
+            # print(policy.action_values(next_state))
             # print(actions)
-            curr_step = [next_coord, actions[0]]
+            curr_step = [curr_state, actions[0]]
             obs, reward, done, truncated, info = sim_env.step(actions[0])
-            next_coord = tuple(self.get_nearestGridCoord(self.obs_to_hashable(obs, **kwargs)))
-            curr_step.append(next_coord)
+            next_state = tuple(self.get_nearestState(self.obs_to_hashable(obs, **kwargs)))
+            curr_step.append(next_state)
             agent_traj.append(curr_step)
+            curr_state = next_state
             max_steps -= 1
         return (agent_traj, info)
 
         # return self._current_state, reward, done, truncated, info
     
 
-    def get_nearestGridCoord(self, coord):
-        _, index = self._search_coordinates.query(coord, 1)
+    def get_nearestState(self, curr_state):
+        _, index = self._search_coordinates.query(curr_state, 1)
         return self._search_coordinates.data[index]
-
+    
+    def coordinate_to_state(self, coord_list):
+        """
+        Takes a list of starting coordinates as inputs and returns a list of all possible states based on 
+        all possible combinations of environment features.
+        """
+        raise NotImplementedError("function \'coordinate_to_state\' not implemented in GymGridworldMDP class, please implement in child class.")
 
     @classmethod
     def get_agentState(cls, env: gymOrderEnforcing, **kwargs) -> gymOrderEnforcing:
@@ -783,12 +792,13 @@ class GymGridworldMDP(GymMDP):
     
 
     @classmethod
-    def set_agentState(cls, env: gymOrderEnforcing, **kwargs) -> gymOrderEnforcing:
+    def set_agentState(cls, env: gymOrderEnforcing, target_state, **kwargs) -> gymOrderEnforcing:
         """
         GIven an an environment and agent properties, set the state of the agent.
 
         Args:
             env (Gym Environment): The environment where the agent state needs to be set.
+            target_state: the state to which the agent has to be set.
         """
         raise NotImplementedError("function \'set_agentState\' not implemented in GymGridworldMDP class, please implement in child class.")
 
