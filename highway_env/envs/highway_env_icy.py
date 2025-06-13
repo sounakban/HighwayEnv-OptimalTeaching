@@ -56,6 +56,7 @@ class HighwayEnvIcy(AbstractEnv):
     def _reset(self) -> None:
         self._create_road()
         self._create_vehicles()
+        self._create_staticObjects()
 
     def _create_road(self) -> None:
         """Create a road composed of straight adjacent lanes."""
@@ -101,38 +102,48 @@ class HighwayEnvIcy(AbstractEnv):
         # # DEBUG: Print all vehicle positions
         # print([veh.position for veh in self.road.vehicles])
 
-        # Add ice
-        num_icePatches = self.config.get("ice_count", len(ice_locations_subset))
+
+    def _create_staticObjects(self) -> None:
+        # |Get environment dimensions
+        x_max = max([lane.end[0] for lane in self.road.network.lanes_list()])
+        y_max = max([lane.end[1] for lane in self.road.network.lanes_list()])
+        
+        # |Define dimensions
         length, width = 15, 5
-        for pos in ice_locations_subset[:num_icePatches]:
-            ice = Ice1(self.road, pos)
+
+        # |Randomized ice and object locations
+        remaining_ice = self.config["ice_count"]
+        remaining_obstacle = self.config["obstacle_count"]
+        while remaining_ice and remaining_obstacle:
+            ice = Ice1.create_random(
+                    self.road, spacing=3 / self.config["vehicles_density"]
+                )
             ice.LENGTH, ice.WIDTH = (length, width)
             ice.diagonal = np.sqrt(ice.LENGTH**2 + ice.WIDTH**2)
             self.road.objects.append(ice)
-        # TODO: Add logic for randomizing ice locations
-        # length, width = 15, 5
-        # for _ in range(self.config["ice_count"]):
-        #     ice = Ice1.create_random(
-        #             self.road, spacing=1 / self.config["vehicles_density"]
-        #         )
+            remaining_ice = remaining_ice - 1 if remaining_ice > 0 else 0 
+            obstacle = Obstacle.create_random(
+                    self.road, spacing=3 / self.config["vehicles_density"]
+                )
+            obstacle.LENGTH, obstacle.WIDTH = (length, width)
+            obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
+            self.road.objects.append(obstacle)
+            remaining_obstacle = remaining_obstacle - 1 if remaining_obstacle > 0 else 0
+
+        # Add ice from predefined positions
+        # ice_locations_filtered = [loc for loc in ice_locations if loc[0]<(x_max-length/2) and loc[1]<=y_max]
+        # num_icePatches = self.config.get("ice_count", len(ice_locations_filtered))
+        # for pos in ice_locations_filtered[:num_icePatches]:
+        #     ice = Ice1(self.road, pos)
         #     ice.LENGTH, ice.WIDTH = (length, width)
         #     ice.diagonal = np.sqrt(ice.LENGTH**2 + ice.WIDTH**2)
         #     self.road.objects.append(ice)
 
-        # Add Obstacles
-        num_obstacles = self.config.get("obstacle_count", len(obstacle_locations))
-        length, width = 15, 5
-        for pos in obstacle_locations[:num_obstacles]:
-            obstacle = Obstacle(self.road, pos)
-            obstacle.LENGTH, obstacle.WIDTH = (length, width)
-            obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
-            self.road.objects.append(obstacle)
-        # TODO: Add logic for randomizing obstacle locations
-        # length, width = 15, 5
-        # for _ in range(self.config["obstacle_count"]):
-        #     obstacle = obstacle.create_random(
-        #             self.road, spacing=1 / self.config["vehicles_density"]
-        #         )
+        # Add Obstacles from predefined positions
+        # obstacle_locations_filtered = [loc for loc in obstacle_locations if loc[0]<(x_max-length/2) and loc[1]<=y_max]
+        # num_obstacles = self.config.get("obstacle_count", len(obstacle_locations_filtered))
+        # for pos in obstacle_locations_filtered[:num_obstacles]:
+        #     obstacle = Obstacle(self.road, pos)
         #     obstacle.LENGTH, obstacle.WIDTH = (length, width)
         #     obstacle.diagonal = np.sqrt(obstacle.LENGTH**2 + obstacle.WIDTH**2)
         #     self.road.objects.append(obstacle)

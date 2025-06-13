@@ -629,11 +629,22 @@ class GymGridworldMDP(GymMDP):
         else:
             # |DEBUG: Sequential execution test
             return_vals = []
+            return_vals_append = return_vals.append
             for st_act in list(state_action_pairs):
-                return_vals.append(self.simulateAction_wState(st_act, sim_env=self._env,
+                return_vals_append(self.simulateAction_wState(st_act, sim_env=self._env,
                                                             obs_config=tuple(self.config["observation"]["features"]),
                                                             **kwargs)
                                     )
+            # |OR
+            # return_vals = map(functools.partial(self.simulateAction_wState, sim_env=self._env,
+            #                                         obs_config=tuple(self.config["observation"]["features"]),
+            #                                         **kwargs),
+            #                         state_action_pairs)
+            # |OR
+            # return_vals = [self.simulateAction_wState(st_act, sim_env=self._env,
+            #                                                 obs_config=tuple(self.config["observation"]["features"]),
+            #                                                 **kwargs)
+            #                 for st_act in list(state_action_pairs)]
         # |Create KDTree of all coordinates to effectively search for closest coordinate
         self._search_coordinates = scp.spatial.KDTree(state_list)
         # |Populate MDP tables
@@ -757,6 +768,7 @@ class GymGridworldMDP(GymMDP):
             # print(policy.action_values(next_state))
             # print(actions)
             curr_step = [curr_state, actions[0]]
+            sim_env = self.set_agentState(sim_env, target_state=curr_state, **kwargs)   # Reset state based on dicretized locations
             obs, reward, done, truncated, info = sim_env.step(actions[0])
             next_state = tuple(self.get_nearestState(self.obs_to_hashable(obs, **kwargs)))
             curr_step.append(next_state)
