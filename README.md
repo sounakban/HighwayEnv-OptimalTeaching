@@ -1,3 +1,11 @@
+
+# HighwayEnv-OptimalTeaching
+
+This is a fork of the original highway-env repository, which contains research code written by Sounak Banerjee from the CoDec Laboratory (headed by Prof Mark Ho) at New York University. The research is funded by Toyota Research Institute, and is done in collaboration with Deepak Gopinath from TRI. The research-specific code lives in the [scripts](./scripts) directory. File names beginning with 'CoDec_' are relevant to our research.
+
+Additionally, the simulator itself has been significantly modified, and the current version extends the original simulator with project-relevant features.
+
+
 # highway-env
 
 [![build](https://github.com/eleurent/highway-env/workflows/build/badge.svg)](https://github.com/eleurent/highway-env/actions?query=workflow%3Abuild)
